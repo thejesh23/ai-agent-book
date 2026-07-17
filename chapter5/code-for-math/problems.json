@@ -1,0 +1,68 @@
+[
+  {
+    "id": 1,
+    "question": "How many positive integers less than or equal to 2024 are divisible by none of 3, 5, and 7?",
+    "answer": 925,
+    "topic": "number theory (inclusion-exclusion)"
+  },
+  {
+    "id": 2,
+    "question": "Find the remainder when 2^2024 is divided by 1000.",
+    "answer": 216,
+    "topic": "modular exponentiation"
+  },
+  {
+    "id": 3,
+    "question": "Find the number of ordered pairs (a, b) of positive integers with a <= b that satisfy 1/a + 1/b = 1/12.",
+    "answer": 8,
+    "topic": "diophantine equation"
+  },
+  {
+    "id": 4,
+    "question": "Find the sum of all positive integers n for which n^2 + 12n - 2007 is a perfect square.",
+    "answer": 1464,
+    "topic": "perfect squares"
+  },
+  {
+    "id": 5,
+    "question": "Find the greatest integer that divides n^5 - 5n^3 + 4n for every integer n.",
+    "answer": 120,
+    "topic": "polynomial divisibility"
+  },
+  {
+    "id": 6,
+    "question": "How many integers from 1 to 1000 inclusive can be written as a^2 + b^2 for some non-negative integers a and b?",
+    "answer": 330,
+    "topic": "sum of two squares"
+  },
+  {
+    "id": 7,
+    "question": "Find the largest three-digit prime factor of the binomial coefficient C(2000, 1000).",
+    "answer": 661,
+    "topic": "prime factorization"
+  },
+  {
+    "id": 8,
+    "question": "How many integers from 1 to 1000 inclusive have exactly 6 positive divisors?",
+    "answer": 110,
+    "topic": "divisor counting"
+  },
+  {
+    "id": 9,
+    "question": "Find the coefficient of x^10 in the expansion of (1 + x + x^2 + x^3 + x^4 + x^5 + x^6)^5.",
+    "answer": 826,
+    "topic": "generating functions"
+  },
+  {
+    "id": 10,
+    "question": "Find the remainder when the sum 1! + 2! + 3! + ... + 100! is divided by 1000.",
+    "answer": 313,
+    "topic": "factorials and modular arithmetic"
+  },
+  {
+    "id": 11,
+    "question": "How many ordered pairs of integers (x, y) satisfy x^2 + y^2 < 400?",
+    "answer": 1245,
+    "topic": "lattice points"
+  }
+]
