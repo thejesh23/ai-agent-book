@@ -91,7 +91,7 @@ sudo apt install ffmpeg
 - tests/
   - provider-tests.js: Comprehensive provider testing
 - run-tests.js: Test runner with environment validation
-- PROVIDER_GUIDE.md: Detailed provider configuration guide
+- utils/providers/: Provider configuration (ASR / LLM / TTS)
 - package.json: Backend dependencies and scripts
 ```
 
@@ -297,7 +297,7 @@ The test suite will automatically skip providers for which you don't have API ke
 - **High Accuracy**: Use OpenAI ASR + OpenAI LLM
 - **China Deployment**: Use Siliconflow ASR + ARK LLM
 
-For detailed troubleshooting and configuration guidance, see [PROVIDER_GUIDE.md](backend/PROVIDER_GUIDE.md).
+For provider configuration, see [`backend/config.js.example`](backend/config.js.example) and the provider implementations under [`backend/utils/providers/`](backend/utils/providers).
 
 ## License
 

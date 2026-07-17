@@ -1,0 +1,101 @@
+"""
+Configuration for Memobase Agent with Kimi K3 Model
+"""
+
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Kimi K3 Model Configuration
+KIMI_API_KEY = os.getenv("KIMI_API_KEY", "sk-your-api-key")
+KIMI_BASE_URL = "https://api.moonshot.cn/v1"
+KIMI_MODEL = "kimi-k3"  # Kimi K3 model identifier
+
+# Model Parameters
+MODEL_TEMPERATURE = 0.7
+MODEL_MAX_TOKENS = 4096
+MODEL_TOP_P = 0.95
+
+# Context Window Configuration
+CONTEXT_WINDOW_SIZE = 128000  # Experiment context budget (K3 itself supports up to 1M tokens)
+MAX_MEMORY_ENTRIES = 100
+MEMORY_COMPRESSION_THRESHOLD = 50  # Compress when memory exceeds this
+
+# Memobase Configuration
+MEMOBASE_CONFIG = {
+    "memory_types": [
+        "episodic",      # Task-specific memories
+        "semantic",      # General knowledge
+        "procedural",    # Learned procedures and patterns
+        "working"        # Short-term working memory
+    ],
+    "retention_policy": "adaptive",  # adaptive, fixed, or decay
+    "compression_strategy": "hierarchical",  # hierarchical, summary, or selective
+    "storage_backend": "local",  # local, redis, or postgresql
+}
+
+# LOCOMO Benchmark Configuration
+LOCOMO_CONFIG = {
+    "benchmark_path": Path("benchmarks/locomo"),
+    "evaluation_metrics": [
+        "task_completion",
+        "reasoning_accuracy",
+        "memory_utilization",
+        "context_efficiency",
+        "adaptation_score"
+    ],
+    "task_categories": [
+        "multi_turn_reasoning",
+        "long_context_qa",
+        "task_planning",
+        "knowledge_integration",
+        "tool_usage"
+    ],
+    "max_turns": 20,
+    "timeout_seconds": 300
+}
+
+# Memory Database Configuration
+MEMORY_DB_PATH = Path("memory_store")
+MEMORY_DB_PATH.mkdir(exist_ok=True)
+
+# Logging Configuration
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+LOG_FILE = Path("logs") / "memobase_agent.log"
+LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# Agent Configuration
+AGENT_CONFIG = {
+    "name": "MemobaseAgent",
+    "version": "1.0.0",
+    "capabilities": [
+        "long_term_memory",
+        "context_compression",
+        "adaptive_learning",
+        "tool_calling",
+        "multi_turn_reasoning"
+    ],
+    "max_retries": 3,
+    "retry_delay": 1.0,
+}
+
+# Tool Configuration
+ENABLE_WEB_SEARCH = True
+ENABLE_CODE_EXECUTION = True
+ENABLE_FILE_OPERATIONS = True
+ENABLE_DATABASE_ACCESS = True
+
+# Performance Optimization
+BATCH_SIZE = 10
+CACHE_ENABLED = True
+CACHE_TTL = 3600  # 1 hour
+PARALLEL_PROCESSING = True
+MAX_WORKERS = 4
+
+# Experimental Features
+ENABLE_MEMORY_CONSOLIDATION = True  # Consolidate memories during idle time
+ENABLE_PREDICTIVE_CACHING = True    # Pre-fetch likely needed memories
+ENABLE_ADAPTIVE_COMPRESSION = True  # Adjust compression based on usage patterns

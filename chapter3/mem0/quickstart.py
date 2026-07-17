@@ -1,0 +1,228 @@
+"""Quick start example for Mem0 agent with Kimi K3."""
+
+import asyncio
+import os
+from dotenv import load_dotenv
+from rich.console import Console
+
+from agent import Mem0Agent
+from config import Config
+
+
+# Load environment variables
+load_dotenv()
+
+console = Console()
+
+
+async def basic_example():
+    """Basic example of using Mem0 agent."""
+    console.print("[bold cyan]Basic Mem0 Agent Example[/bold cyan]\n")
+    
+    # Initialize configuration
+    config = Config.from_env()
+    
+    # Initialize agent
+    console.print("[yellow]Initializing agent...[/yellow]")
+    agent = Mem0Agent(config)
+    
+    # Create a session context
+    session_id = "quickstart_session"
+    user_id = "quickstart_user"
+    agent_id = "quickstart_agent"
+    
+    context = agent.create_context(
+        agent_id=agent_id,
+        user_id=user_id,
+        session_id=session_id
+    )
+    
+    console.print(f"[green]Session created: {session_id}[/green]\n")
+    
+    # Example conversation
+    conversations = [
+        "Hello! I'm interested in learning about machine learning.",
+        "I prefer Python for programming and have experience with scikit-learn.",
+        "What would you recommend as the next step in my ML journey?",
+        "Can you remind me what programming language I mentioned earlier?",
+        "What libraries have I mentioned using?"
+    ]
+    
+    for i, user_input in enumerate(conversations, 1):
+        console.print(f"[bold]Turn {i} - User:[/bold] {user_input}")
+        
+        # Process the turn
+        response, metrics = await agent.process_turn_async(session_id, user_input)
+        
+        console.print(f"[cyan]Agent:[/cyan] {response}")
+        console.print(f"[dim]Response time: {metrics['generation_time']:.2f}s[/dim]\n")
+        
+        # Small delay for readability
+        await asyncio.sleep(0.5)
+    
+    # Display final metrics
+    console.print("\n[bold]Session Metrics:[/bold]")
+    agent.display_metrics(session_id)
+    
+    # Show stored memories
+    console.print("\n[bold]Stored Memories:[/bold]")
+    memories = agent.memory.get_all(user_id=user_id)
+    for memory in memories:
+        console.print(f"- {memory.get('memory', memory.get('text', 'N/A'))}")
+
+
+async def multi_session_example():
+    """Example showing memory persistence across sessions."""
+    console.print("\n[bold cyan]Multi-Session Memory Example[/bold cyan]\n")
+    
+    # Initialize agent
+    config = Config.from_env()
+    agent = Mem0Agent(config)
+    
+    user_id = "persistent_user"
+    
+    # First session
+    console.print("[yellow]Starting Session 1...[/yellow]")
+    session1_id = "session_001"
+    context1 = agent.create_context(
+        agent_id="agent_001",
+        user_id=user_id,
+        session_id=session1_id
+    )
+    
+    # First session conversation
+    response1, _ = await agent.process_turn_async(
+        session1_id, 
+        "Hi! I'm working on a project about renewable energy, specifically solar panels."
+    )
+    console.print(f"[cyan]Session 1 Response:[/cyan] {response1}\n")
+    
+    response2, _ = await agent.process_turn_async(
+        session1_id,
+        "I need to analyze efficiency data from different manufacturers."
+    )
+    console.print(f"[cyan]Session 1 Response:[/cyan] {response2}\n")
+    
+    # Second session (different session, same user)
+    console.print("[yellow]Starting Session 2 (after some time)...[/yellow]")
+    session2_id = "session_002"
+    context2 = agent.create_context(
+        agent_id="agent_001",
+        user_id=user_id,
+        session_id=session2_id
+    )
+    
+    # Second session should remember context from first session
+    response3, _ = await agent.process_turn_async(
+        session2_id,
+        "What was I working on last time we talked?"
+    )
+    console.print(f"[cyan]Session 2 Response:[/cyan] {response3}\n")
+    
+    response4, _ = await agent.process_turn_async(
+        session2_id,
+        "Can you help me continue with that project?"
+    )
+    console.print(f"[cyan]Session 2 Response:[/cyan] {response4}\n")
+    
+    # Show all memories
+    console.print("[bold]All Memories for User:[/bold]")
+    memories = agent.memory.get_all(user_id=user_id)
+    for memory in memories:
+        console.print(f"- {memory.get('memory', memory.get('text', 'N/A'))}")
+
+
+async def multi_agent_example():
+    """Example with multiple agents collaborating."""
+    console.print("\n[bold cyan]Multi-Agent Collaboration Example[/bold cyan]\n")
+    
+    # Initialize agent
+    config = Config.from_env()
+    agent = Mem0Agent(config)
+    
+    user_id = "collaboration_user"
+    session_id = "collab_session"
+    
+    # Create contexts for multiple agents
+    agents = ["researcher", "analyst", "advisor"]
+    contexts = {}
+    
+    for agent_id in agents:
+        contexts[agent_id] = agent.create_context(
+            agent_id=agent_id,
+            user_id=user_id,
+            session_id=f"{session_id}_{agent_id}"
+        )
+        console.print(f"[green]Created context for {agent_id}[/green]")
+    
+    # Collaborative conversation
+    console.print("\n[yellow]Starting collaborative discussion...[/yellow]\n")
+    
+    # Researcher starts
+    response1, _ = await agent.process_turn_async(
+        f"{session_id}_researcher",
+        "I've found some interesting data on climate change impacts on agriculture."
+    )
+    console.print(f"[cyan]Researcher:[/cyan] {response1}\n")
+    
+    # Analyst responds
+    response2, _ = await agent.process_turn_async(
+        f"{session_id}_analyst",
+        "Based on what the researcher mentioned, what are the key metrics we should analyze?"
+    )
+    console.print(f"[cyan]Analyst:[/cyan] {response2}\n")
+    
+    # Advisor provides guidance
+    response3, _ = await agent.process_turn_async(
+        f"{session_id}_advisor",
+        "Considering both the research and analysis perspectives, what recommendations can we make?"
+    )
+    console.print(f"[cyan]Advisor:[/cyan] {response3}\n")
+    
+    # Show metrics for all agents
+    console.print("[bold]Performance Metrics:[/bold]")
+    for agent_id in agents:
+        console.print(f"\n[yellow]{agent_id.capitalize()}:[/yellow]")
+        summary = agent.get_performance_summary(f"{session_id}_{agent_id}")
+        for key, value in summary.items():
+            if isinstance(value, float):
+                console.print(f"  {key}: {value:.3f}")
+            else:
+                console.print(f"  {key}: {value}")
+
+
+async def main():
+    """Run all examples."""
+    console.print(Panel.fit(
+        "[bold]Mem0 Agent Quickstart Examples[/bold]\n"
+        "Demonstrating various capabilities of the Mem0 agent with Kimi K3",
+        title="Welcome"
+    ))
+    
+    # Check for API key
+    if not os.getenv("KIMI_API_KEY"):
+        console.print("[red]Error: KIMI_API_KEY not found in environment[/red]")
+        console.print("Please set your Kimi API key in the .env file")
+        return
+    
+    try:
+        # Run examples
+        await basic_example()
+        await asyncio.sleep(1)
+        
+        await multi_session_example()
+        await asyncio.sleep(1)
+        
+        await multi_agent_example()
+        
+        console.print("\n[green]All examples completed successfully![/green]")
+        
+    except Exception as e:
+        console.print(f"[red]Error running examples: {e}[/red]")
+        import traceback
+        traceback.print_exc()
+
+
+if __name__ == "__main__":
+    from rich.panel import Panel
+    asyncio.run(main())
