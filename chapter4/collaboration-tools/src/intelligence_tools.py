@@ -5,7 +5,7 @@ Based on AWorld intelligence-* servers.
 import json
 import logging
 import os
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 from openai import OpenAI
 from dotenv import load_dotenv
@@ -149,14 +149,15 @@ async def guard_reasoning_process(
         client = OpenAI(api_key=api_key)
         
         rules_text = "\n".join(f"- {rule}" for rule in (safety_rules or []))
-        
+        safety_rules_block = f"Safety Rules to Check:\n{rules_text}" if safety_rules else ""
+
         prompt = f"""Evaluate the safety and appropriateness of the following proposed action:
 
 Proposed Action: {proposed_action}
 
 Context: {json.dumps(context, indent=2)}
 
-{f'Safety Rules to Check:\\n{rules_text}' if safety_rules else ''}
+{safety_rules_block}
 
 Analyze whether this action is:
 1. Safe to execute

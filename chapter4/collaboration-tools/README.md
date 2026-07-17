@@ -11,6 +11,14 @@ A comprehensive Model Context Protocol (MCP) server that provides collaboration 
 - Take screenshots
 - Full virtual browser capabilities
 
+### 🤝 Sub-Agent Management (子 Agent 管理)
+- Spawn sub-agents in **sync** (wait for result) or **async** (returns a `task_id`) mode
+- Send follow-up messages to a sub-agent and cancel a running one
+- **Two context-passing strategies**, made inspectable (context text + token count):
+  - `minimal` — pass only the task plus an optional hand-picked slice (cheapest, private, may starve the sub-agent)
+  - `llm_generated` — one extra LLM call synthesizes a compact, privacy-filtered hand-off context from the parent trajectory
+- Sub-agent system prompt uses labeled context sources (`[FROM_MAIN_AGENT]` / `[FROM_USER]` / `[TOOL_RESULT]`) and standardized JSON output
+
 ### 👤 Human-in-the-Loop (HITL)
 - Request admin approval for sensitive actions
 - Request input from human administrators
@@ -120,6 +128,20 @@ Run the quickstart demo to see all features in action:
 python quickstart.py
 ```
 
+### Sub-Agent Context Strategy Comparison (对比效果)
+
+Spawn a sub-agent under **both** context-passing strategies on the same task and
+print the difference (context tokens handed off, extra preparation cost, whether
+private data leaked, and each sub-agent's result). Requires `OPENAI_API_KEY`
+(default model `gpt-4o-mini`, override with `OPENAI_MODEL`):
+```bash
+export OPENAI_API_KEY=sk-...
+python subagent_comparison.py
+```
+Typically `minimal` uses far fewer tokens and never leaks private fields, but the
+sub-agent may return `need_info`; `llm_generated` spends one extra LLM call to
+hand off richer, privacy-filtered context so the sub-agent can complete the task.
+
 ### Using with Claude Desktop
 
 Add to your Claude Desktop configuration (`claude_desktop_config.json`):
@@ -152,6 +174,12 @@ Add to your Claude Desktop configuration (`claude_desktop_config.json`):
 - `mcp_send_telegram_message` - Send Telegram message
 - `mcp_send_slack_message` - Send Slack message
 - `mcp_send_discord_message` - Send Discord message
+
+### Sub-Agent Tools
+- `mcp_spawn_subagent` - Spawn a sub-agent (sync/async, `minimal`/`llm_generated` context)
+- `mcp_send_message_to_subagent` - Send a follow-up message to a sub-agent
+- `mcp_cancel_subagent` - Cancel a sub-agent
+- `mcp_get_subagent_status` - Get a sub-agent's status/result (for async)
 
 ### Human-in-the-Loop Tools
 - `mcp_request_admin_approval` - Request admin approval
