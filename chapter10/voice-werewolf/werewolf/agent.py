@@ -39,6 +39,26 @@ def _to_openrouter_model(model: str) -> str:
     return "openai/gpt-5.6-luna"          # 兜底：当前便宜旗舰
 
 
+def _safe_create(client, **kwargs):
+    """调用 Chat Completions；对推理型模型（如 gpt-5.x）的参数限制做自动降级重试：
+    - 不支持 max_tokens 时改用 max_completion_tokens；
+    - 不支持非默认 temperature 时移除该参数（回退到模型默认 1）。
+    这样同一份代码既能跑传统模型（gpt-4o，temperature=0.8），也能跑推理模型。"""
+    for _ in range(3):
+        try:
+            return client.chat.completions.create(**kwargs)
+        except Exception as e:
+            msg = str(e)
+            if "max_completion_tokens" in msg and "max_tokens" in kwargs:
+                kwargs["max_completion_tokens"] = kwargs.pop("max_tokens")
+                continue
+            if "temperature" in msg and "temperature" in kwargs:
+                kwargs.pop("temperature", None)
+                continue
+            raise
+    return client.chat.completions.create(**kwargs)
+
+
 def get_client():
     """返回全局共享的 LLM 客户端（懒加载，进程内单例）。
 
@@ -120,7 +140,7 @@ class PlayerAgent:
                       max_tokens=max(max_tokens, 512))
         if json_mode:
             kwargs["response_format"] = {"type": "json_object"}
-        resp = get_client().chat.completions.create(**kwargs)
+        resp = _safe_create(get_client(), **kwargs)
         # content 可能为 None（如被截断）；用空串兜底，交由上层解析做降级处理。
         return (resp.choices[0].message.content or "").strip()
 
