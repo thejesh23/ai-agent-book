@@ -60,12 +60,12 @@ def run_llm_demo():
         return
     
     print("\n✅ API key found!")
-    print("🧠 Initializing Kimi K3 LLM agent...")
+    print("🧠 Initializing Kimi K2 LLM agent...")
     
     # Initialize agent
     agent = LLMAgent(
         api_key=api_key,
-        model="kimi-k3",
+        model=os.getenv("MOONSHOT_MODEL", "kimi-k2-0711-preview"),
         temperature=0.7,
         max_experiences=30
     )

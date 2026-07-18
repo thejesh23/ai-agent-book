@@ -156,12 +156,33 @@ python main.py --mode single \
 ### 6. Run Ablation Study
 
 ```bash
-# With default provider
+# With default provider (single case, all five context modes)
 python main.py --mode ablation
 
 # With Doubao provider
 python main.py --mode ablation --provider doubao
+
+# Multi-case comparison across modes (stronger evidence for the book's point)
+python main.py --mode ablation --cases 3
+
+# Compare only two modes and save raw results to a custom path
+python main.py --mode ablation --ablation-modes full no_history --output my_ablation.json
 ```
+
+`main.py` is the single CLI entry point. Run `python main.py --help` for the
+full (Chinese) flag reference.
+
+Key flags:
+
+| Flag | Description |
+|------|-------------|
+| `--mode` | `single` / `ablation` / `interactive` (default) |
+| `--task` | Task text for `single` mode |
+| `--context-mode` | Context mode for `single` mode (`full`, `no_history`, `no_reasoning`, `no_tool_calls`, `no_tool_results`) |
+| `--ablation-modes` | Subset of modes to test in `ablation` mode (default: all five) |
+| `--cases` | Number of cases each mode is run against in `ablation` mode (default: 1) |
+| `--provider` / `--model` | LLM provider and optional model override |
+| `--output` | Output path for the JSON result (single) or raw results (ablation) |
 
 ## 🧪 Ablation Studies
 
@@ -177,25 +198,39 @@ A complex financial analysis task requiring:
 
 ### Expected Behaviors
 
-| Context Mode | Expected Behavior | Impact |
-|-------------|-------------------|---------|
-| **Full** | Complete successful execution | Baseline performance |
-| **No History** | Redundant operations, inefficiency | May repeat tool calls |
-| **No Reasoning** | Unstructured approach, potential errors | Lacks strategic planning |
-| **No Tool Calls** | Complete failure | Cannot interact with external world |
-| **No Tool Results** | Incorrect conclusions | Makes decisions without feedback |
+| Context Mode | Removed Component (book §实验 1.1) | Expected Behavior | Impact |
+|-------------|-----------------------------------|-------------------|---------|
+| **full** | none (baseline) | Complete successful execution | Baseline performance |
+| **no_history** | 历史消息 (history) | Redundant operations, inefficiency | May repeat tool calls |
+| **no_reasoning** | 思考过程 (reasoning) | Unstructured approach, potential errors | Lacks strategic planning |
+| **no_tool_calls** | 工具定义 (tool definitions) | Complete failure | Cannot interact with external world |
+| **no_tool_results** | 工具执行结果 (tool results) | Incorrect conclusions | Makes decisions without feedback |
+
+**How each ablation is applied** (see `agent.py`):
+
+- **no_tool_calls** — the `tools` parameter is omitted from the request, so the model has no tool definitions to call.
+- **no_tool_results** — every tool result is replaced with a `[Tool result hidden]` placeholder.
+- **no_reasoning** — `reasoning_content` is stripped from each assistant message before it is added back to the trajectory.
+- **no_history** — `_prepare_messages_for_api()` sends only a sliding window (system prompt + current task + the most recent ReAct step) to the model, so earlier steps are forgotten and the agent tends to repeat tool calls. Full mode always sends the complete trajectory.
 
 ### Running Tests
 
 ```bash
-# Run full ablation study
-python ablation_tests.py
+# Run the full ablation study (single case, all five modes)
+python main.py --mode ablation
+
+# Run across multiple cases for a stronger comparison
+python main.py --mode ablation --cases 3
 
 # This will generate:
-# - ablation_study_results.png (visualization)
+# - ablation_study_results.png (visualization, if matplotlib is installed)
 # - ablation_study_report.md (detailed report)
-# - ablation_results.json (raw data)
+# - ablation_results.json (raw data; override path with --output)
 ```
+
+The console prints two tables: a per-run **ablation study results** table and a
+**comparison matrix** (context mode x case) for reading the effect of each
+component at a glance.
 
 ## 📊 Understanding Results
 
@@ -315,15 +350,17 @@ export LOG_LEVEL=DEBUG
 
 ```
 context/
-├── agent.py              # Core agent implementation
-├── ablation_tests.py     # Ablation study test suite
-├── main.py              # Entry point with CLI
+├── agent.py              # Core agent implementation + context modes
+├── main.py              # Single CLI entry point (single / ablation / interactive)
 ├── config.py            # Configuration management
 ├── create_sample_pdf.py # PDF generation utility
 ├── requirements.txt     # Dependencies
 ├── env.example         # Environment template
 └── README.md           # This file
 ```
+
+> Note: the ablation study lives in `main.py` (`AblationTestSuite`), run via
+> `python main.py --mode ablation`. There is no separate `ablation_tests.py`.
 
 ## 🔬 Research Applications
 

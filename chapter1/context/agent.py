@@ -479,8 +479,13 @@ Important: When you have gathered all necessary information and computed the fin
     
     def _build_context(self) -> str:
         """
-        Build context based on the current mode
-        
+        Build a human-readable summary of the trajectory (legacy helper, kept
+        for inspection/debugging only).
+
+        NOTE: The message list sent to the model is assembled by
+        ``_prepare_messages_for_api`` -- that is where the NO_HISTORY ablation
+        actually takes effect. This method is not part of the request path.
+
         Returns:
             Context string for the model
         """
@@ -559,8 +564,51 @@ Important: When you have gathered all necessary information and computed the fin
         
         if tool_name not in tool_map:
             return {"error": f"Unknown tool: {tool_name}"}
-        
+
         return tool_map[tool_name](**arguments)
+
+    def _prepare_messages_for_api(self) -> List[Dict[str, Any]]:
+        """
+        Build the message list actually sent to the model for the current
+        iteration, applying the NO_HISTORY ablation.
+
+        For every mode except NO_HISTORY the full conversation history (the
+        accumulated trajectory) is returned unchanged. For NO_HISTORY a sliding
+        window is returned that keeps only:
+          - the system prompt (static prefix), and
+          - the latest user task plus the MOST RECENT ReAct step (the last
+            assistant message together with the tool results that follow it).
+        All earlier steps are dropped, so the agent "forgets" what it already
+        did and tends to repeat tool calls -- exactly the failure mode the book
+        attributes to missing 历史消息 (history). Keeping the last assistant
+        message together with its trailing tool messages preserves API validity
+        (tool results stay paired with their assistant tool_calls).
+
+        Returns:
+            The message list to send to the model for this iteration.
+        """
+        messages = self.conversation_history
+        if self.context_mode != ContextMode.NO_HISTORY:
+            return messages
+
+        # System prompt(s) are always kept as the static prefix.
+        windowed = [m for m in messages if m.get("role") == "system"]
+
+        # Anchor on the latest user task.
+        user_indices = [i for i, m in enumerate(messages) if m.get("role") == "user"]
+        if not user_indices:
+            return windowed
+        last_user_idx = user_indices[-1]
+        windowed.append(messages[last_user_idx])
+
+        # Keep only the most recent step after the task: from the last assistant
+        # message to the end. Its tool results follow it, so the pairing stays
+        # valid while every earlier step is dropped.
+        tail = messages[last_user_idx + 1:]
+        assistant_rel = [i for i, m in enumerate(tail) if m.get("role") == "assistant"]
+        if assistant_rel:
+            windowed.extend(tail[assistant_rel[-1]:])
+        return windowed
 
     def execute_task(self, task: str, max_iterations: int = 10) -> Dict[str, Any]:
         """
@@ -587,24 +635,29 @@ Important: When you have gathered all necessary information and computed the fin
             logger.info(f"Iteration {iteration}/{max_iterations}")
             
             try:
+                # Build the message list actually sent to the model. For every
+                # mode except NO_HISTORY this equals the full trajectory; for
+                # NO_HISTORY it is a sliding window that drops earlier steps.
+                api_messages = self._prepare_messages_for_api()
+
                 # Prepare request data for logging
                 request_data = {
                     "model": self.model,
-                    "messages": messages,
+                    "messages": api_messages,
                     "temperature": _reasoning_safe_temperature(self.model, 0.3),
                     "max_tokens": 8192
                 }
-                
+
                 if self.context_mode != ContextMode.NO_TOOL_CALLS:
                     request_data["tools"] = self._get_tools_description()
                     request_data["tool_choice"] = "auto"
-                
+
                 logger.info(f"Sending request to {self.provider} API")
 
                 # Call the model with tools
                 response = self.client.chat.completions.create(
                     model=self.model,
-                    messages=messages,
+                    messages=api_messages,
                     tools=self._get_tools_description() if self.context_mode != ContextMode.NO_TOOL_CALLS else None,
                     tool_choice="auto" if self.context_mode != ContextMode.NO_TOOL_CALLS else None,
                     temperature=_reasoning_safe_temperature(self.model, 0.3),

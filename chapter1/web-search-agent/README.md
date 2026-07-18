@@ -53,9 +53,26 @@ MOONSHOT_API_KEY=your-api-key-here
 
 ### 3. 运行 Agent
 
-**快速体验**（引导式交互）：
+`main.py` 提供了完整的命令行接口（中文帮助）。查看全部参数：
+
 ```bash
-python quickstart.py
+python main.py --help
+```
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `query` | 要提问的问题（位置参数）；省略则进入交互模式 | 无 |
+| `--provider` | 搜索后端：`kimi`（调用内置 `$web_search`，需 API Key）/ `offline-demo`（离线示例轨迹） | `kimi` |
+| `--model` | 模型名称 | `kimi-k3` |
+| `--max-steps` | 最大 ReAct 迭代次数 | `5` |
+| `--base-url` | API 基础 URL | `https://api.moonshot.cn/v1` |
+| `--api-key` | Kimi API Key（默认读环境变量） | 环境变量 |
+| `--output`, `-o` | 将问题、ReAct 轨迹与答案保存为 JSON | 无 |
+| `--quiet` | 不实时打印 ReAct 轨迹 | 打印 |
+
+**离线演示 ReAct 循环**（无需 API Key，回放示例轨迹，直观展示“想→做→看”）：
+```bash
+python main.py --provider offline-demo
 ```
 
 **交互模式**（持续对话）：
@@ -63,15 +80,23 @@ python quickstart.py
 python main.py
 ```
 
-**单次问答**：
+**单次问答**（运行时逐步打印思考/行动/观察轨迹）：
 ```bash
 python main.py "2024年诺贝尔物理学奖获得者是谁？"
+python main.py "比特币现价" --max-steps 3 --output result.json
+```
+
+**快速体验**（引导式交互）：
+```bash
+python quickstart.py
 ```
 
 **高级示例**：
 ```bash
 python examples.py
 ```
+
+> 💡 运行时会实时打印 **ReAct 轨迹**：💭 思考 → 🔧 行动（调用 `$web_search`）→ 👀 观察（搜索结果）→ ✅ 最终答案，对应本章讲的“想→做→看”循环。`agent.get_trace()` 可获取结构化轨迹，`--output` 可将其存为 JSON。
 
 ## 📖 使用示例
 
@@ -109,11 +134,14 @@ python examples.py
 
 ### `agent.py` - 核心 Agent 实现
 - `WebSearchAgent`: 主要的 Agent 类
-- `search_and_answer()`: 执行搜索并生成答案的主方法
+- `search_and_answer()`: 执行 ReAct 循环并生成答案的主方法
+- `get_trace()`: 返回上一次运行的结构化 ReAct 轨迹（思考/行动/观察/最终答案）
 - `_chat()`: 与 Kimi API 进行对话交互
 - `_get_system_prompt()`: 获取系统提示，定义 Agent 行为
 - `_get_tools()`: 定义可用的工具（$web_search）
 - `search_impl()`: 搜索实现的抽象层，便于扩展
+- `format_trace_step()`: 将一条轨迹步骤渲染为可读文本
+- `run_offline_demo()`: 离线回放示例轨迹，无需 API Key 即可演示 ReAct 循环
 
 ### `config.py` - 配置管理
 - API 配置
@@ -121,9 +149,10 @@ python examples.py
 - 搜索参数设置
 
 ### `main.py` - 主程序入口
+- `build_parser()`: argparse 命令行接口（中文帮助，见 `--help`）
 - `run_interactive_mode()`: 交互式对话模式
 - `run_single_question()`: 单次问答模式
-- 命令行参数处理
+- 离线演示模式（`--provider offline-demo`）与 JSON 结果输出（`--output`）
 - 会话管理
 
 ### `quickstart.py` - 快速体验脚本

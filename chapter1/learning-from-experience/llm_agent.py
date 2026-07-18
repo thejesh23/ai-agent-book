@@ -1,6 +1,8 @@
 """
-LLM-based Agent using In-Context Learning with Kimi K3 API.
+LLM-based Agent using In-Context Learning with the Kimi (Moonshot) API.
 This demonstrates how LLMs can generalize through reasoning without extensive training.
+Default model is Kimi K2 (matching 实验 7-2 in the book); override via the
+`model` argument or the MOONSHOT_MODEL environment variable.
 """
 
 import os
@@ -36,18 +38,18 @@ class LLMAgent:
     Stores experiences and uses them to reason about future actions.
     """
     
-    def __init__(self, 
+    def __init__(self,
                  api_key: str = None,
-                 model: str = "kimi-k3",  # Kimi K3 model
+                 model: str = "kimi-k2-0711-preview",  # Kimi K2 (see 实验 7-2)
                  base_url: str = "https://api.moonshot.cn/v1",
                  temperature: float = 0.7,
                  max_experiences: int = 50):
         """
-        Initialize LLM agent with Kimi K3 API.
-        
+        Initialize LLM agent with the Kimi (Moonshot) API.
+
         Args:
             api_key: Kimi API key (or set MOONSHOT_API_KEY env var)
-            model: Model name for Kimi K3
+            model: Model name (Moonshot/Kimi, default kimi-k2-0711-preview)
             base_url: API base URL
             temperature: Sampling temperature for generation
             max_experiences: Maximum number of experiences to store

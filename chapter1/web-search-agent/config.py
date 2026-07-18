@@ -17,10 +17,10 @@ class Config:
     KIMI_BASE_URL: str = "https://api.moonshot.cn/v1"
     
     # 模型配置
-    DEFAULT_MODEL: str = "kimi-k3"  # 使用最新的 K2 模型
-    
+    DEFAULT_MODEL: str = "kimi-k3"  # 使用最新的 Kimi K3 模型
+
     # 搜索配置
-    MAX_SEARCH_ITERATIONS: int = 3  # 最大搜索迭代次数
+    MAX_SEARCH_ITERATIONS: int = 5  # 最大搜索迭代次数（与 agent 默认值保持一致）
     SEARCH_TIMEOUT: int = 30  # 搜索超时时间（秒）
     
     # 日志配置
