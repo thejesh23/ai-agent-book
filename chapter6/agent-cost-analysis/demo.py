@@ -2,8 +2,9 @@
 实验 6-7：Agent 任务的端到端成本分析（可运行 demo + CLI）。
 
 两种运行方式：
-  1) 在线（--live，默认）：真实调用 OpenAI（gpt-4o-mini），token 与 cached_tokens
-     取自 API 返回的 usage，成本按单价换算。需要 OPENAI_API_KEY。
+  1) 在线（--live，默认）：真实调用模型（默认 gpt-5.6-luna），token 与 cached_tokens
+     取自 API 返回的 usage，成本按单价换算。需要 OPENAI_API_KEY 或 OPENROUTER_API_KEY
+     （无 OpenAI key 时自动回退到 OpenRouter；gpt-5.x 只要有 OpenRouter key 就优先走它）。
   2) 离线（--offline）：不打模型，读入一份此前真实运行录下的 trace（canned token
      counts），用可配置的单价重新计算成本、成本构成与 A/B 对比表。无需 API key。
 
@@ -71,15 +72,24 @@ def resolve_scenarios(arg: str):
 # 采集：在线跑真实模型，或离线从 trace 文件读回
 # ---------------------------------------------------------------------------
 def collect_live(keys, pricing, warmup: bool):
-    from openai import OpenAI
     import agent
 
-    if not os.environ.get("OPENAI_API_KEY"):
-        print("未检测到 OPENAI_API_KEY，请先 export OPENAI_API_KEY=sk-... "
-              "或改用 --offline（离线复算，无需 key）。", file=sys.stderr)
+    if not (os.environ.get("OPENAI_API_KEY") or os.environ.get("OPENROUTER_API_KEY")):
+        print("未检测到 OPENAI_API_KEY 或 OPENROUTER_API_KEY，请先 export 其一 "
+              "（无 OpenAI key 时会自动回退到 OpenRouter），或改用 --offline（离线复算，无需 key）。",
+              file=sys.stderr)
         sys.exit(1)
 
-    client = OpenAI(timeout=60.0, max_retries=2)
+    # 构造 client 并解析实际模型名（可能被回退映射成 OpenRouter id）。
+    client, resolved = config.make_client_and_model(config.MODEL)
+    if resolved != config.MODEL:
+        print(f">>> 已回退到 OpenRouter：模型 {config.MODEL} -> {resolved}")
+        config.MODEL = resolved
+        agent.MODEL = resolved
+        try:
+            agent._encoder.cache_clear()
+        except Exception:
+            pass
     tracers = []
     for k in keys:
         name, kv, compress = agent.SCENARIOS[k]

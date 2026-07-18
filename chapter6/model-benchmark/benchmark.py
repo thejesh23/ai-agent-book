@@ -33,6 +33,25 @@ from openai import OpenAI
 
 
 # ---------------------------------------------------------------------------
+# OpenRouter 回退：对「OpenAI 原生」条目（base_url 为空）在缺主 key 时改走 OpenRouter。
+# gpt-5.x 直连 OpenAI 需组织实名认证，只要有 OPENROUTER_API_KEY 就优先走 OpenRouter。
+# ---------------------------------------------------------------------------
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+
+
+def _to_openrouter_model(model: str) -> str:
+    """把模型名映射成 OpenRouter id：含 '/' 视为原生 id；gpt-* -> openai/*；
+    claude-* -> anthropic/claude-opus-4.8；其余回退到 openai/gpt-5.6-luna。"""
+    if "/" in model:
+        return model
+    if model.startswith("gpt-"):
+        return "openai/" + model
+    if model.startswith("claude-"):
+        return "anthropic/claude-opus-4.8"
+    return "openai/gpt-5.6-luna"
+
+
+# ---------------------------------------------------------------------------
 # 提供商配置
 # ---------------------------------------------------------------------------
 @dataclass
@@ -47,15 +66,47 @@ class ProviderConfig:
     def api_key(self) -> Optional[str]:
         return os.environ.get(self.api_key_env)
 
+    def _openrouter_key(self) -> Optional[str]:
+        return os.environ.get("OPENROUTER_API_KEY", "").strip() or None
+
+    def resolve(self) -> tuple[Optional[str], Optional[str], str, bool]:
+        """解析实际使用的 (api_key, base_url, model, 是否经 OpenRouter)。
+
+        仅「OpenAI 原生」条目（base_url 为空）参与回退；带专属 base_url 的条目
+        （如 Kimi/豆包）保持不变。回退规则：
+          - gpt-5.x 且有 OPENROUTER_API_KEY -> 优先走 OpenRouter（直连需实名认证）；
+          - 否则主 key 存在 -> 直连，模型名不变；
+          - 否则（OpenAI 原生 + 有 OPENROUTER_API_KEY）-> 走 OpenRouter，模型名映射。
+        """
+        primary = self.api_key()
+        openai_native = self.base_url is None
+        orkey = self._openrouter_key() if openai_native else None
+        prefer_or = bool(orkey) and self.model.startswith("gpt-5")
+
+        if not prefer_or and primary:
+            return primary, self.base_url, self.model, False
+        if orkey:
+            return orkey, OPENROUTER_BASE_URL, _to_openrouter_model(self.model), True
+        return primary, self.base_url, self.model, False
+
     def is_available(self) -> bool:
-        """只有 key 存在时才纳入实测。"""
-        return bool(self.api_key())
+        """主 key 存在即可测；OpenAI 原生条目在缺主 key 时可回退 OpenRouter。"""
+        if self.api_key():
+            return True
+        return self.base_url is None and self._openrouter_key() is not None
 
 
 # 默认只跑"手上有有效 key"的三家提供商。
 # 需要扩展时，往这里追加 ProviderConfig 即可（例如 DeepSeek 官方 vs SiliconFlow 对比）。
 DEFAULT_PROVIDERS: list[ProviderConfig] = [
-    # OpenAI 官方（一个 key 测两个模型，观察同厂不同规格的差异）
+    # OpenAI 官方（一个 key 测多个模型，观察同厂不同规格的差异）
+    # gpt-5.6-luna 为当前廉价旗舰；无 OPENAI_API_KEY 时自动经 OpenRouter 路由
+    # （openai/gpt-5.6-luna），gpt-5.x 只要有 OPENROUTER_API_KEY 就优先走 OpenRouter。
+    ProviderConfig(
+        name="OpenAI/gpt-5.6-luna",
+        model="gpt-5.6-luna",
+        api_key_env="OPENAI_API_KEY",
+    ),
     ProviderConfig(
         name="OpenAI/gpt-4o-mini",
         model="gpt-4o-mini",
@@ -249,9 +300,13 @@ def benchmark_provider(
     # 请求被如实记为「失败」（计入可用性下降），而不是被静默重试从而拉高延迟、
     # 掩盖真实故障。每次请求仍带 per-call timeout（见 measure_once）。
     # 再加一个客户端级 timeout 作为兜底，避免个别请求永久挂起拖死线程池。
+    # 解析实际使用的凭据/端点/模型（OpenAI 原生条目缺 key 时回退 OpenRouter）。
+    api_key, base_url, model, via_openrouter = cfg.resolve()
+    if via_openrouter:
+        print(f"    （回退 OpenRouter：{cfg.model} -> {model}）", flush=True)
     client = OpenAI(
-        api_key=cfg.api_key(),
-        base_url=cfg.base_url,
+        api_key=api_key,
+        base_url=base_url,
         timeout=timeout,
         max_retries=0,
     )
@@ -260,11 +315,11 @@ def benchmark_provider(
     batch_start = time.perf_counter()
     if concurrency <= 1:
         for _ in range(num_requests):
-            results.append(measure_once(client, cfg.model, prompt, max_tokens, timeout))
+            results.append(measure_once(client, model, prompt, max_tokens, timeout))
     else:
         with ThreadPoolExecutor(max_workers=concurrency) as pool:
             futures = [
-                pool.submit(measure_once, client, cfg.model, prompt, max_tokens, timeout)
+                pool.submit(measure_once, client, model, prompt, max_tokens, timeout)
                 for _ in range(num_requests)
             ]
             for fut in as_completed(futures):
@@ -275,7 +330,7 @@ def benchmark_provider(
     errors = [r.error for r in results if not r.ok and r.error]
     return ProviderSummary(
         provider=cfg.name,
-        model=cfg.model,
+        model=model,
         total=num_requests,
         success=success,
         results=results,

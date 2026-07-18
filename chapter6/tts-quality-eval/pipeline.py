@@ -2,7 +2,11 @@
 
 一条评估链路：
   合成(OpenAI TTS) -> 时长探测(ffprobe) -> 回译(Whisper) -> 计算 CER/字准确率
-      -> LLM Rubric 打分(gpt-4o-mini) [可选: Gemini 音频评审]
+      -> LLM Rubric 打分(gpt-5.6-luna) [可选: Gemini 音频评审 gemini-3.5-flash]
+
+说明：TTS 合成与 Whisper 回译必须走 OpenAI 直连（OpenRouter 不提供音频/转写）；
+仅 LLM Rubric 的 chat 评审支持 OpenRouter 回退——gpt-5.x 直连需组织实名认证，
+故只要有 OPENROUTER_API_KEY 就优先经 OpenRouter 调评审模型（见 get_judge_client_and_model）。
 
 所有对外函数都做了健壮性处理：单条失败抛出带上下文的异常，由 demo.py 捕获后
 在汇总表里记为失败，而不会中断整表。
@@ -28,15 +32,71 @@ _client: Optional[OpenAI] = None
 
 
 def get_client() -> OpenAI:
+    """OpenAI 直连 client：用于 TTS 合成与 Whisper 回译（这两项不能走 OpenRouter）。"""
     global _client
     if _client is None:
         key = os.environ.get("OPENAI_API_KEY", "").strip()
         if not key:
             raise RuntimeError(
-                "缺少 OPENAI_API_KEY。请 `export OPENAI_API_KEY=sk-...` 或写入 .env。"
+                "缺少 OPENAI_API_KEY（TTS 合成 / Whisper 回译需 OpenAI 直连）。"
+                "请 `export OPENAI_API_KEY=sk-...` 或写入 .env。"
             )
         _client = OpenAI(api_key=key, max_retries=5, timeout=60.0)
     return _client
+
+
+# ---------------------------------------------------------------------------
+# LLM Rubric 评审客户端：支持 OpenRouter 回退。
+# gpt-5.x 直连 OpenAI 需组织实名认证，只要有 OPENROUTER_API_KEY 就优先走 OpenRouter。
+# 注意：仅 chat 评审可回退；TTS / Whisper 仍需 OpenAI 直连（见 get_client）。
+# ---------------------------------------------------------------------------
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+_judge_client: Optional[OpenAI] = None
+_judge_client_kind: str = ""
+
+
+def _to_openrouter_model(model: str) -> str:
+    """把模型名映射成 OpenRouter id：含 '/' 视为原生 id；gpt-* -> openai/*；
+    claude-* -> anthropic/claude-opus-4.8；其余回退到 openai/gpt-5.6-luna。"""
+    if "/" in model:
+        return model
+    if model.startswith("gpt-"):
+        return "openai/" + model
+    if model.startswith("claude-"):
+        return "anthropic/claude-opus-4.8"
+    return "openai/gpt-5.6-luna"
+
+
+def get_judge_client_and_model(model: str):
+    """构造 LLM 评审用的 client 并返回 (client, 实际模型名)。
+
+    回退：gpt-5.x 且有 OPENROUTER_API_KEY -> 优先 OpenRouter；否则有 OPENAI_API_KEY ->
+    直连；否则有 OPENROUTER_API_KEY -> OpenRouter（模型名映射）；皆无 -> 清晰报错。
+    """
+    global _judge_client, _judge_client_kind
+    primary = os.environ.get("OPENAI_API_KEY", "").strip()
+    orkey = os.environ.get("OPENROUTER_API_KEY", "").strip()
+    prefer_or = bool(orkey) and model.startswith("gpt-5")
+
+    if not prefer_or and primary:
+        if _judge_client_kind != "openai":
+            _judge_client = OpenAI(api_key=primary, max_retries=5, timeout=60.0)
+            _judge_client_kind = "openai"
+        return _judge_client, model
+    if orkey:
+        if _judge_client_kind != "openrouter":
+            _judge_client = OpenAI(base_url=OPENROUTER_BASE_URL, api_key=orkey,
+                                   max_retries=5, timeout=60.0)
+            _judge_client_kind = "openrouter"
+        return _judge_client, _to_openrouter_model(model)
+    if primary:
+        if _judge_client_kind != "openai":
+            _judge_client = OpenAI(api_key=primary, max_retries=5, timeout=60.0)
+            _judge_client_kind = "openai"
+        return _judge_client, model
+    raise RuntimeError(
+        "缺少 OPENAI_API_KEY / OPENROUTER_API_KEY，无法运行 LLM Rubric 评审。"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -293,7 +353,9 @@ class RubricResult:
 
 def judge_rubric(reference: str, emotion: str, hypothesis: str,
                  duration: float, cer: float, model: Optional[str] = None) -> RubricResult:
-    """用评审模型（默认 gpt-4o-mini）按 Rubric 打分。返回结构化分数 + 点评。"""
+    """用评审模型（默认 gpt-5.6-luna）按 Rubric 打分。返回结构化分数 + 点评。
+
+    评审 chat 调用支持 OpenRouter 回退（见 get_judge_client_and_model）。"""
     chars = len(normalize(reference))
     speed = chars / duration if duration > 0 else 0.0
     user = (
@@ -304,8 +366,9 @@ def judge_rubric(reference: str, emotion: str, hypothesis: str,
         f"语速：{speed:.2f} 字/秒（参考文本 {chars} 个有效字符）\n"
         f"字错误率 CER：{cer:.3f}\n"
     )
-    resp = get_client().chat.completions.create(
-        model=model or config.JUDGE_MODEL,
+    judge_client, judge_model = get_judge_client_and_model(model or config.JUDGE_MODEL)
+    resp = judge_client.chat.completions.create(
+        model=judge_model,
         messages=[{"role": "system", "content": _JUDGE_SYSTEM},
                   {"role": "user", "content": user}],
         temperature=0.0,
@@ -337,9 +400,9 @@ def _resolve_gemini_model(api_key: str) -> str:
             data = json.loads(r.read())
         names = [m["name"].split("/")[-1] for m in data.get("models", [])
                  if "generateContent" in m.get("supportedGenerationMethods", [])]
-        # 优先书中方案的 gemini-2.5-pro，再退到 flash 系列。
-        for want in (config.GEMINI_MODEL_DEFAULT, "gemini-2.5-pro",
-                     "gemini-2.5-flash", "gemini-flash-latest"):
+        # 优先默认的 gemini-3.5-flash（已验证支持音频输入），再退到 pro / 旧 flash 系列。
+        for want in (config.GEMINI_MODEL_DEFAULT, "gemini-3.5-flash",
+                     "gemini-2.5-pro", "gemini-2.5-flash", "gemini-flash-latest"):
             if want in names:
                 return want
         # 退而求其次：任意非 tts/image 的可用模型

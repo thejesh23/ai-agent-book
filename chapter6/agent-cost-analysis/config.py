@@ -8,17 +8,67 @@
     - 输出        : $0.60  / 1M tokens
 
 注意：
-1. 只依赖 OpenAI（gpt-4o-mini），不要接入 OpenRouter / Anthropic / DeepSeek / SiliconFlow。
+1. 默认模型为 gpt-5.6-luna（当前廉价旗舰）。首选凭据是 OPENAI_API_KEY；若未设置，
+   自动回退到 OPENROUTER_API_KEY 并把模型名映射成 OpenRouter id（gpt-* -> openai/*）。
+   由于 gpt-5.x 直连 OpenAI 需要组织实名认证，只要 OPENROUTER_API_KEY 存在就优先走
+   OpenRouter（见 make_client_and_model）。仍可用 COST_DEMO_MODEL / --model 切换任意模型。
 2. OpenAI 的 prompt caching 是「自动」的：当请求前缀 >= 1024 token 且与近期请求
    命中相同前缀时，usage.prompt_tokens_details.cached_tokens 会大于 0，
    这部分 token 按缓存价（更便宜）计费。本项目正是用它来真实体现 KV-cache 的节省。
+   （OpenRouter 转发 OpenAI 时同样在 prompt_tokens_details.cached_tokens 回传缓存命中。）
 """
 
 import os
 from dataclasses import dataclass
 
-# 使用的模型（务必是 OpenAI 有效模型）
-MODEL = os.environ.get("COST_DEMO_MODEL", "gpt-4o-mini")
+# 使用的模型（默认当前廉价旗舰 gpt-5.6-luna；可用 COST_DEMO_MODEL / --model 覆盖）
+MODEL = os.environ.get("COST_DEMO_MODEL", "gpt-5.6-luna")
+
+# OpenRouter 回退：无 OPENAI_API_KEY 时用 OPENROUTER_API_KEY 走 OpenAI 兼容端点。
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+
+
+def _to_openrouter_model(model: str) -> str:
+    """把模型名映射成 OpenRouter id：含 '/' 视为原生 id；gpt-* -> openai/*；
+    claude-* -> anthropic/claude-opus-4.8；其余回退到 openai/gpt-5.6-luna。"""
+    if "/" in model:
+        return model
+    if model.startswith("gpt-"):
+        return "openai/" + model
+    if model.startswith("claude-"):
+        return "anthropic/claude-opus-4.8"
+    return "openai/gpt-5.6-luna"
+
+
+def make_client_and_model(model: str):
+    """构造 OpenAI 兼容 client 并返回 (client, 实际调用的模型名)。
+
+    回退策略（universal OpenRouter fallback）：
+      - gpt-5.x 且存在 OPENROUTER_API_KEY -> 优先走 OpenRouter（直连需组织实名认证）；
+      - 否则有 OPENAI_API_KEY -> 直连 OpenAI，模型名不变；
+      - 否则有 OPENROUTER_API_KEY -> 走 OpenRouter，模型名按 _to_openrouter_model 映射；
+      - 两者皆无 -> 抛出清晰错误。
+    """
+    from openai import OpenAI
+
+    primary = os.environ.get("OPENAI_API_KEY", "").strip()
+    orkey = os.environ.get("OPENROUTER_API_KEY", "").strip()
+    prefer_openrouter = bool(orkey) and model.startswith("gpt-5")
+
+    if not prefer_openrouter and primary:
+        return OpenAI(timeout=60.0, max_retries=2), model
+    if orkey:
+        return (
+            OpenAI(base_url=OPENROUTER_BASE_URL, api_key=orkey,
+                   timeout=60.0, max_retries=2),
+            _to_openrouter_model(model),
+        )
+    if primary:
+        return OpenAI(timeout=60.0, max_retries=2), model
+    raise RuntimeError(
+        "缺少可用凭据：请设置 OPENAI_API_KEY（直连 OpenAI），或设置 "
+        "OPENROUTER_API_KEY（自动回退到 OpenRouter）；或改用 --offline 离线复算（无需 key）。"
+    )
 
 # 每百万 token 的美元单价（默认 gpt-4o-mini）
 PRICE_INPUT_PER_M = 0.15      # 普通输入

@@ -11,12 +11,13 @@ from dataclasses import dataclass, field
 # ---------------------------------------------------------------------------
 # 模型名（均为 OpenAI，读 OPENAI_API_KEY）。
 # ---------------------------------------------------------------------------
-WHISPER_MODEL = "whisper-1"        # 语音转写（回译），用于计算 WER/字准确率
-JUDGE_MODEL = "gpt-4o-mini"        # LLM Rubric 评审模型
+WHISPER_MODEL = "whisper-1"        # 语音转写（回译），用于计算 WER/字准确率（须走 OpenAI 直连）
+JUDGE_MODEL = "gpt-5.6-luna"       # LLM Rubric 评审模型（当前廉价旗舰；chat 调用可回退 OpenRouter）
 
-# 可选的 Gemini 音频评审（书中方案，书中用 Gemini 2.5 Pro）。模型名可能随时间过期，
-# 运行时会通过 REST /models 探测校正。仅当 --gemini 开启时才会用到。
-GEMINI_MODEL_DEFAULT = "gemini-2.5-pro"
+# 可选的 Gemini 音频评审（书中方案）。默认用当前廉价旗舰 gemini-3.5-flash（已验证支持
+# 音频输入，能直接「听」合成语音）。模型名可能随时间过期，运行时会通过 REST /models
+# 探测校正。仅当 --gemini 开启时才会用到。
+GEMINI_MODEL_DEFAULT = "gemini-3.5-flash"
 
 # 计费单价（美元），仅用于打印粗略成本，不影响评分。数值随官方调整可能变化。
 PRICE = {

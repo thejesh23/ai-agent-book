@@ -46,16 +46,21 @@
   > 说明：本仓库仅 **OpenAI** 路径经端到端验证；其余四家按各自公开 REST 文档实现，请用自己
   > 账号可用的 voice/model 覆盖 `config.PROVIDER_CONFIGS` 后使用。缺对应 key 时该 provider
   > 的行会被记为失败，**不中断整表**。
-- **质量评审（默认）**：**OpenAI 闭环，无需额外 key**。用 Whisper（`whisper-1`）把合成
-  语音回译成文本算 CER，再用 `gpt-4o-mini` 基于「转写文本 + 时长 + 语速 + CER」按 Rubric
-  打分。转写时用简体中文提示语引导 Whisper 输出简体，避免繁体字形差异虚高 CER。
+- **质量评审（默认）**：用 Whisper（`whisper-1`）把合成语音回译成文本算 CER，再用
+  `gpt-5.6-luna`（当前廉价旗舰）基于「转写文本 + 时长 + 语速 + CER」按 Rubric 打分。
+  转写时用简体中文提示语引导 Whisper 输出简体，避免繁体字形差异虚高 CER。
+  **凭据/回退**：TTS 合成与 Whisper 回译必须走 **OpenAI 直连**（`OPENAI_API_KEY`，
+  OpenRouter 不提供音频/转写）；**仅 LLM Rubric 的 chat 评审支持 OpenRouter 回退**——
+  `gpt-5.x` 直连需组织实名认证，故只要设置了 `OPENROUTER_API_KEY`，评审就优先走
+  OpenRouter（`gpt-*` 映射为 `openai/*`）。
 - **质量评审（可选，书中方案）**：`--gemini` 让 **Gemini 多模态直接「听」音频**打分
-  （原文 + 音频 + Rubric 一起输入），需 `GEMINI_API_KEY`。默认模型为书中方案的
-  `gemini-2.5-pro`；代码会先探测 `/models`，若该名不可用再自动回退到当前可用模型
-  （如 `gemini-2.5-flash`）。
+  （原文 + 音频 + Rubric 一起输入），需 `GEMINI_API_KEY`。默认模型为
+  `gemini-3.5-flash`（已验证支持音频输入）；代码会先探测 `/models`，若该名不可用再
+  自动回退到当前可用模型（如 `gemini-2.5-pro`）。
 
-> 书中用 Gemini 2.5 Pro 直接听合成语音打分；本 demo 默认改用「Whisper 回译 + LLM
-> Rubric」以便**零额外配置即可跑通**，同时保留 `--gemini` 开关复现书中方案。两者的
+> 书中用 Gemini 直接听合成语音打分（本 demo 默认 `gemini-3.5-flash`，已验证支持音频）；
+> 默认改用「Whisper 回译 + LLM Rubric」以便**零额外配置即可跑通**，同时保留 `--gemini`
+> 开关复现书中方案。两者的
 > 区别：Gemini 能直接感知音色/韵律/情感；回译方案只能基于可测特征做保守推断（见「局限」）。
 
 ## 文件

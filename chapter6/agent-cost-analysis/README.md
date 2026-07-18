@@ -4,7 +4,7 @@
 
 对一个典型的多轮 Agent 任务（客服退款）做**全链路成本拆解**，用**自建的轻量 tracing / 可观测系统**记录每次 LLM 调用的输入/输出/缓存 token、时延与成本：按步骤聚合出「哪一步最贵」，按**成本构成**拆出「未缓存输入 / 缓存输入 / 输出各占多少、工具返回注入了多少 token」，并给出**单步成本分布（p50/p95/p99）**；再做完整 **2×2 A/B 对比**，量化 **KV-cache 复用** 与 **上下文压缩** 两个杠杆各自及叠加后的真实成本差异。
 
-- 只依赖 **OpenAI**（`gpt-4o-mini`），通过 openai Python SDK 调用。
+- 默认模型 **`gpt-5.6-luna`**（当前廉价旗舰），通过 openai Python SDK 调用。首选 `OPENAI_API_KEY`；未设置时**自动回退到 `OPENROUTER_API_KEY`**（走 OpenRouter 兼容端点，`gpt-*` 映射为 `openai/*`）。由于 `gpt-5.x` 直连 OpenAI 需组织实名认证，只要存在 `OPENROUTER_API_KEY` 就优先走 OpenRouter。
 - KV-cache 的节省是**真实**的：利用 OpenAI 的自动 prompt caching（前缀 ≥ 1024 token 且命中近期相同前缀时，`usage.prompt_tokens_details.cached_tokens > 0`，这部分输入按缓存价 5 折计费）。
 - 提供**离线模式**：不打模型，读入一份此前真实运行录下的 token 用量（`sample_trace.json`，canned token counts），用可配置单价**重新计算**成本/成本构成/A/B 对比表——无需 API key 即可复现全部表格，也可一键换算到其它模型定价。
 
@@ -24,8 +24,8 @@
 ```bash
 pip install -r requirements.txt
 
-# 在线（真实调用 OpenAI，需要 key）：默认跑 A(朴素)+B(优化) 两组
-export OPENAI_API_KEY=sk-...
+# 在线（真实调用模型，需要 key）：默认跑 A(朴素)+B(优化) 两组
+export OPENAI_API_KEY=sk-...           # 或 export OPENROUTER_API_KEY=sk-or-...（自动回退）
 python demo.py
 
 # 离线（无需 key）：用内置 canned trace 复算全部表格
@@ -161,4 +161,4 @@ python demo.py --offline --price-input 0.20 --price-cached 0.10 --price-output 0
 - 具体数字每次在线运行会有小幅波动：OpenAI 的 prompt cache 是**尽力而为**的（按约 128 token 的块缓存、约 5–10 分钟过期、偶尔未命中），因此某些轮次可能出现 `cached_tokens=0`（如上面 B 组的 turn-2/turn-4）。`demo.py` 在正式计量前会先对 KV-cache 组跑一次「预热」把稳定前缀写入缓存，让命中更稳定；`--no-warmup` 可关闭。
 - 价格写在 `config.py`（`PRICING_PRESETS`），默认是 gpt-4o-mini 的公开单价（输入 \$0.15 / 缓存 \$0.075 / 输出 \$0.60 每百万 token）。**换模型**：用 `--model`（如 `--model gpt-4o`）或 `--price-*` 直接覆盖单价即可；缓存命中要求稳定前缀 ≥ 1024 token，换更强模型不影响该机制。
 - 「工具返回注入」token 用 tiktoken 按当前模型的编码器离线估算（统计每轮输入里工具返回文本占多少 token），用于回答书中「一次工具返回可能占 2000-5000 token，且在后续每轮被反复计费」这一放大因素。
-- 只使用 OpenAI；不要接入 OpenRouter / Anthropic / DeepSeek / SiliconFlow。
+- 凭据：首选 `OPENAI_API_KEY`；未设置时自动回退到 `OPENROUTER_API_KEY`（走 OpenRouter，`gpt-*` 映射为 `openai/*`）。`gpt-5.x` 直连需组织实名认证，故有 `OPENROUTER_API_KEY` 时优先走 OpenRouter。离线复算（`--offline`）无需任何 key。

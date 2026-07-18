@@ -117,14 +117,20 @@ python demo.py --mock --concurrency-sweep 1,2,4,8,16     # 合成并发压测表
 
 ## 默认测试的提供商
 
-代码里 `DEFAULT_PROVIDERS` 默认只跑**手上有有效 key**的三家（OpenAI 一个 key 测两个模型）：
+代码里 `DEFAULT_PROVIDERS` 默认只跑**手上有有效 key**的提供商（OpenAI 一个 key 测多个模型）：
 
 | 展示名 | 模型 | base_url | key 环境变量 |
 | --- | --- | --- | --- |
-| OpenAI/gpt-4o-mini | gpt-4o-mini | （官方默认） | OPENAI_API_KEY |
-| OpenAI/gpt-4o | gpt-4o | （官方默认） | OPENAI_API_KEY |
+| OpenAI/gpt-5.6-luna | gpt-5.6-luna | （官方默认，可回退 OpenRouter） | OPENAI_API_KEY |
+| OpenAI/gpt-4o-mini | gpt-4o-mini | （官方默认，可回退 OpenRouter） | OPENAI_API_KEY |
+| OpenAI/gpt-4o | gpt-4o | （官方默认，可回退 OpenRouter） | OPENAI_API_KEY |
 | Moonshot/moonshot-v1-8k | moonshot-v1-8k | https://api.moonshot.cn/v1 | MOONSHOT_API_KEY |
 | Doubao/doubao-1.5-pro-32k | doubao-1-5-pro-32k-250115 | https://ark.cn-beijing.volces.com/api/v3 | ARK_API_KEY |
+
+> **OpenRouter 回退**：`OpenAI/*` 这几条（base_url 为空的 OpenAI 原生条目）在未设置
+> `OPENAI_API_KEY` 时会自动改走 **OpenRouter**（`OPENROUTER_API_KEY`，模型名映射为
+> `openai/*`）。`gpt-5.x` 直连 OpenAI 需组织实名认证，因此只要设置了 `OPENROUTER_API_KEY`
+> 就优先走 OpenRouter。带专属 `base_url` 的条目（Kimi/豆包）不参与回退。
 
 **提供商列表是可配置的**：在 `benchmark.py` 的 `DEFAULT_PROVIDERS` 里追加
 `ProviderConfig(...)` 即可扩展。所有提供商都走同一套 OpenAI 兼容协议，
@@ -178,5 +184,7 @@ Doubao/doubao-1.5-pro-32k | 10/10 (100%) | 1097ms   | 1487ms   | 2.24s      | 2.
 - **限流**：把并发或 N 调很大时可能触发提供商 RPM/TPM 限流，届时会以失败形式
   计入可用性下降——这本身也是一种"实测限流阈值"的方式（书中实验 6-8 的一环）。
 - **TTFT 与网络强相关**：跨境访问的服务 TTFT 会显著偏高，结论需结合部署地点解读。
-- **失效的 key 已排除**：OPENROUTER / ANTHROPIC / DEEPSEEK / SILICONFLOW 未纳入默认列表；
-  如需启用，在 `DEFAULT_PROVIDERS` 中补充配置并设置对应环境变量即可。
+- **OpenRouter 回退**：未设置 `OPENAI_API_KEY` 时，`OpenAI/*` 条目自动经 OpenRouter 路由
+  （需 `OPENROUTER_API_KEY`，`gpt-*` 映射为 `openai/*`）；`gpt-5.x` 只要有 `OPENROUTER_API_KEY`
+  即优先走 OpenRouter（直连需实名认证）。其它提供商（DEEPSEEK / SILICONFLOW 等）如需启用，
+  在 `DEFAULT_PROVIDERS` 中补充配置并设置对应环境变量即可。
