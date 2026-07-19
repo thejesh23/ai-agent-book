@@ -1,7 +1,8 @@
 #!/bin/bash
 # Build the complete book as a single PDF (ElegantBook design, teal/cyan theme).
 # Requirements: pandoc, xelatex, ElegantBook class, rsvg-convert (librsvg),
-#               fonts: Songti SC / Heiti SC (ctex), Menlo, Arial Unicode MS
+#               fonts: Menlo / Arial Unicode MS (macOS) — Linux auto-falls back
+#               to DejaVu Sans/Mono and Noto CJK (see preamble.tex).
 # Usage: cd book && bash build_pdf.sh
 # Note: chapter/section numbers come from the document class; source headings
 #       carry no manual numbers (see git history for the de-numbering pass).
@@ -11,7 +12,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-OUT="深入理解-AI-Agent-李博杰-v1.1.pdf"
+OUT="Deep-Understanding-of-AI-Agents-Li-Bojie-v1.1.pdf"
 CHAPTERS=(
     introduction.md
     chapter1.md
@@ -47,12 +48,12 @@ pandoc "${CHAPTERS[@]}" \
     --toc-depth=3 \
     --number-sections \
     -V documentclass=elegantbook \
-    -V classoption=lang=cn \
+    -V classoption=lang=en \
     -V classoption=cyan \
     -V classoption=device=normal \
-    -V author="李博杰" \
-    --metadata title-meta="深入理解 AI Agent：设计原理与工程实践" \
-    --metadata author-meta="李博杰" \
+    -V author="Li Bojie" \
+    --metadata title-meta="Deep Understanding of AI Agents: Design Principles and Engineering Practice" \
+    --metadata author-meta="Li Bojie" \
     -H preamble.tex \
     --include-before-body=cover.tex \
     --highlight-style=kate \
