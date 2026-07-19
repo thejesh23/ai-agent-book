@@ -12,6 +12,21 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# ── Runtime environment tweaks (harmless on macOS, needed on Linux/TeX Live) ──
+# 1) This book is large enough to exhaust XeTeX's default main memory
+#    ("TeX capacity exceeded ... [main memory size=5000000]") during page
+#    output. main_memory is baked into the format at dump time, but
+#    extra_mem_top/bot extend an existing format at runtime — so we bump them
+#    here instead of rebuilding the xelatex format.
+export extra_mem_top=8000000
+export extra_mem_bot=8000000
+# 2) The mac-only monospace font (Menlo) is probed with \IfFontExistsTF in
+#    preamble.tex. On systems without it, kpathsea otherwise spawns METAFONT to
+#    build a Menlo.tfm (slow, noisy, always fails) before the DejaVu Sans Mono
+#    fallback engages. Disabling on-the-fly TFM creation makes the probe return
+#    immediately with the correct "not found" result.
+export MKTEXTFM=0
+
 OUT="Deep-Understanding-of-AI-Agents-Li-Bojie-v1.1.pdf"
 CHAPTERS=(
     introduction.md
