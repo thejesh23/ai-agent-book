@@ -114,11 +114,12 @@ class Tracer:
                 step=r.get("step", ""),
                 tool=r.get("tool", ""),
                 kind=r.get("kind", "llm"),
-                prompt_tokens=int(r.get("prompt_tokens", 0)),
-                cached_tokens=int(r.get("cached_tokens", 0)),
-                completion_tokens=int(r.get("completion_tokens", 0)),
-                tool_ctx_tokens=int(r.get("tool_ctx_tokens", -1)),
-                latency_s=float(r.get("latency_s", 0.0)),
+                # 防御：trace JSON 里字段缺失或显式为 null 时按 0（tool_ctx 按未知 -1）处理
+                prompt_tokens=int(r.get("prompt_tokens") or 0),
+                cached_tokens=int(r.get("cached_tokens") or 0),
+                completion_tokens=int(r.get("completion_tokens") or 0),
+                tool_ctx_tokens=int(r.get("tool_ctx_tokens") or -1),
+                latency_s=float(r.get("latency_s") or 0.0),
             )
             span.cost_usd = tr.pricing.cost_usd(
                 span.prompt_tokens, span.cached_tokens, span.completion_tokens)

@@ -380,10 +380,10 @@ def judge_rubric(reference: str, emotion: str, hypothesis: str,
     for dim in RUBRIC_DIMENSIONS:
         item = data.get(dim, {})
         if isinstance(item, dict):
-            scores[dim] = int(item.get("score", 0))
+            scores[dim] = int(item.get("score") or 0)   # score 缺失或为 null 时按 0 分
             reasons[dim] = str(item.get("reason", "")).strip()
-        else:  # 兼容模型直接返回数字
-            scores[dim] = int(item)
+        else:  # 兼容模型直接返回数字（null 按 0 分）
+            scores[dim] = int(item or 0)
             reasons[dim] = ""
     return RubricResult(scores=scores, reasons=reasons, raw=raw)
 
@@ -448,11 +448,20 @@ def judge_gemini_audio(reference: str, emotion: str, audio_path: str) -> RubricR
     )
     with urllib.request.urlopen(req, timeout=90) as r:
         data = json.loads(r.read())
-    text = data["candidates"][0]["content"]["parts"][0]["text"]
+    # Gemini 在安全拦截时不返回 candidates（或 candidate 无 content/parts），
+    # 防御式取值并给出带 promptFeedback 的清晰错误，交由上层记为该条失败。
+    candidates = data.get("candidates") or []
+    parts = []
+    if candidates:
+        parts = (candidates[0].get("content") or {}).get("parts") or []
+    if not parts or not parts[0].get("text"):
+        raise RuntimeError(f"Gemini 未返回评审文本：{data.get('promptFeedback') or data}")
+    text = parts[0]["text"]
     parsed = json.loads(text)
     scores, reasons = {}, {}
+    # 评审 JSON 的 score 字段缺失或为 null 时按 0 分处理，与 judge_rubric 一致
     for dim in RUBRIC_DIMENSIONS:
         item = parsed.get(dim, {})
-        scores[dim] = int(item.get("score", 0)) if isinstance(item, dict) else int(item)
+        scores[dim] = int(item.get("score") or 0) if isinstance(item, dict) else int(item or 0)
         reasons[dim] = str(item.get("reason", "")).strip() if isinstance(item, dict) else ""
     return RubricResult(scores=scores, reasons=reasons, raw=text)

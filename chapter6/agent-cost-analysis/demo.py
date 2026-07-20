@@ -125,7 +125,12 @@ def collect_offline(keys, pricing, trace_path):
             print(f"  [跳过] trace 中没有场景 '{k}'（可用在线模式 --save-trace 补录）",
                   file=sys.stderr)
             continue
-        tr = Tracer.from_records(sc["spans"], name=sc.get("name", k), pricing=pricing)
+        spans = sc.get("spans")
+        if not spans:
+            print(f"  [跳过] trace 中场景 '{k}' 缺少 spans 数据"
+                  f"（可用在线模式 --save-trace 补录）", file=sys.stderr)
+            continue
+        tr = Tracer.from_records(spans, name=sc.get("name", k), pricing=pricing)
         tracers.append((k, tr))
     if not tracers:
         print("trace 里没有任何被选中的场景，退出。", file=sys.stderr)
