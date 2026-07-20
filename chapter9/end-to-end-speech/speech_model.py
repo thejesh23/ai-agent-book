@@ -256,7 +256,8 @@ class CascadedSpeechModel:
             name="LLM 思考",
             model=self.llm_model,
             latency_s=latency,
-            text=resp.choices[0].message.content.strip(),
+            # content 可能为 None（如被截断/拒答）；用空串兜底，避免 .strip() 崩溃。
+            text=(resp.choices[0].message.content or "").strip(),
         )
 
     # -- 阶段 3：TTS 语音合成 ------------------------------------------------

@@ -238,7 +238,12 @@ def _extract_structured(
         temperature=0.0,
         model=model,
     )
-    return _safe_json(raw)
+    structured = _safe_json(raw)
+    # 模型偶尔输出 JSON 数组等合法但非对象的 JSON；归一化为空 dict，
+    # 交给下游 .get 默认值兜底，而不是让 .get 在 list 上崩溃。
+    if not isinstance(structured, dict):
+        structured = {}
+    return structured
 
 
 def _safe_json(raw: str) -> dict[str, Any]:
@@ -338,6 +343,11 @@ def make_phone_call(
     # 用对话轮数粗略折算一个「通话时长」，纯属演示展示用。
     duration = 12 * len(transcript) + 8
 
+    # key_fields 可能是模型误输出的数组/标量等非对象类型，统一归一化为 dict。
+    key_fields = structured.get("key_fields")
+    if not isinstance(key_fields, dict):
+        key_fields = {}
+
     record = CallRecord(
         call_id=f"pc_{uuid.uuid4().hex[:12]}",
         phone_number=phone_number,
@@ -346,7 +356,7 @@ def make_phone_call(
         goal_achieved=bool(structured.get("goal_achieved", False)),
         duration_seconds=duration,
         summary=str(structured.get("summary", "")),
-        key_fields=dict(structured.get("key_fields", {}) or {}),
+        key_fields=key_fields,
         transcript=transcript,
         follow_up_needed=bool(structured.get("follow_up_needed", False)),
         follow_up_reason=str(structured.get("follow_up_reason", "")),

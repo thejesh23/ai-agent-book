@@ -112,6 +112,10 @@ def synthesize_segments(segments, out_path, workdir):
     把 parse() 得到的片段列表合成为一个完整 mp3。
     返回每个片段的合成信息列表（供打印验证）。
     """
+    if not segments:
+        # 解析结果为空（例如输入只有控制标记、没有任何语音正文）时直接给出
+        # 清晰报错，避免走 ffmpeg concat 空列表产生晦涩的 CalledProcessError。
+        raise SystemExit("错误：没有可合成的语音片段（输入可能只含控制标记，没有正文）。")
     os.makedirs(workdir, exist_ok=True)
     parts, info = [], []
     for i, seg in enumerate(segments):
