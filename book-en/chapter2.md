@@ -837,6 +837,8 @@ The Agent Status Bar is the most everyday application of this principle: the Har
 
 [^ch2-5]: Li, Bojie and Noah Shi. *Interaction Scaling: Grounding the Third Axis of Test-Time Compute.* arXiv:2607.11598, 2026.
 
+From this vantage point, the Loop Engineering at the end of Chapter 1's evolutionary arc (developed in Chapter 10 alongside multi-agent collaboration systems) is essentially this third axis of interaction turned into engineering practice: each turn of the loop makes real progress only because the verification step writes observations of the external world back into the context, injecting information the model could not have thought up on its own; remove that step, and the loop merely lets the model shuffle old information around in place. The industry consensus that "the bottleneck of the loop is the verifier, not the model" and the parenthetical finding above—that the ruler used to measure improvement must itself be grounded in real observations, or the loop silently spins its wheels—are two statements of the same fact.
+
 ### Composition of the Agent Status Bar
 
 Based on the theoretical foundation above, the Agent Status Bar includes the following types of information:
