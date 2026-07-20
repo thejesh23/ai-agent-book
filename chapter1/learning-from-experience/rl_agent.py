@@ -225,7 +225,7 @@ class QLearningAgent:
         return {
             "total_episodes": self.total_episodes,
             "total_victories": self.victories,
-            "victory_rate": self.victories / self.total_episodes,
+            "victory_rate": self.victories / self.total_episodes if self.total_episodes else 0.0,
             "final_epsilon": self.epsilon,
             "q_table_size": len(self.q_table),
             "episode_rewards": self.episode_rewards,
@@ -278,7 +278,7 @@ class QLearningAgent:
         return {
             "num_episodes": num_episodes,
             "victories": eval_victories,
-            "victory_rate": eval_victories / num_episodes,
+            "victory_rate": eval_victories / num_episodes if num_episodes else 0.0,
             "avg_reward": np.mean(eval_rewards),
             "std_reward": np.std(eval_rewards),
             "avg_length": np.mean(eval_lengths),

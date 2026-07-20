@@ -557,6 +557,12 @@ def main():
         print("Error: Cannot specify both --deterministic and --stochastic")
         return
 
+    # Episode counts must be positive; 0 would divide by zero in the
+    # train/evaluate victory-rate and average calculations.
+    if args.rl_episodes < 1 or args.llm_episodes < 1 or args.eval_episodes < 1:
+        print("Error: --rl-episodes, --llm-episodes and --eval-episodes must all be >= 1")
+        return
+
     # Resolve run mode (--skip-llm kept as a backwards-compatible alias)
     mode = "qlearning" if args.skip_llm else args.mode
 
