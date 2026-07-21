@@ -78,31 +78,57 @@
     defCode = defCode || "zh";
     var defCfg = cfg[defCode];
 
+    var siteRoot = (window.SITE_ROOT || "").replace(/\/$/, "");
+    var defPrefix = (defCfg.prefix || "").replace(/\/$/, "");
+    var tgtPrefix = (target.prefix || "").replace(/\/$/, "");
+    var defSuf = defCfg.suffix || "";
+    var tgtSuf = target.suffix || "";
+
+    function rewritePath(href) {
+      // Strip the site origin (turn absolute into relative).
+      if (siteRoot && href.indexOf(siteRoot) === 0) {
+        href = href.slice(siteRoot.length);
+      }
+      // Strip leading slash.
+      href = href.replace(/^\//, "");
+      // Replace default language prefix → target prefix.
+      if (defPrefix && href.indexOf(defPrefix) === 0) {
+        href = tgtPrefix + href.slice(defPrefix.length);
+      }
+      // Suffix swap (handles both .html and directory forms).
+      // Source suffix is stripped; target suffix is inserted before .html or trailing /.
+      if (defSuf) {
+        // e.g. "chapter1.ta.html" → "chapter1.html"
+        href = href.split(defSuf + ".").join(".");
+        // also: "chapter1.ta/" → "chapter1/"
+        href = href.split(defSuf + "/").join("/");
+      }
+      if (tgtSuf) {
+        // e.g. "chapter1.html" → "chapter1.ta.html"
+        //      "chapter1/"     → "chapter1.ta/"
+        href = href.split(".").join(".");
+        href = href.replace(/\.html$/, tgtSuf + ".html");
+        href = href.replace(/\/$/, tgtSuf + "/");
+      }
+      return "/" + href;
+    }
+
     var links = document.querySelectorAll(".md-nav__link");
     for (var i = 0; i < links.length; i++) {
       var el = links[i];
       var href = el.getAttribute("href");
-      if (!href || href.indexOf("http") === 0 || href.charAt(0) === "#") continue;
-      href = href.replace(/^\//, "");
+      if (!href || href.charAt(0) === "#") continue;
 
-      // Rewrite href.
-      var defPrefix = (defCfg.prefix || "").replace(/\/$/, "");
-      var tgtPrefix = (target.prefix || "").replace(/\/$/, "");
-      if (defPrefix && href.indexOf(defPrefix) === 0) {
-        href = tgtPrefix + href.slice(defPrefix.length);
+      // Rewrite href (handles both absolute and relative).
+      if (href.indexOf("http") === 0 || href.indexOf("/" + defPrefix) !== -1 || href.indexOf(defPrefix) !== -1) {
+        var newHref = rewritePath(href);
+        if (newHref) el.setAttribute("href", newHref);
       }
-      var defSuf = defCfg.suffix || "";
-      var tgtSuf = target.suffix || "";
-      if (defSuf) href = href.replace(defSuf + ".html", ".html");
-      if (tgtSuf && href.indexOf(".html") !== -1) {
-        href = href.replace(/\.html$/, tgtSuf + ".html");
-      }
-      el.setAttribute("href", "/" + href);
 
-      // Rewrite link text: only replace the text node (preserve icon/span).
+      // Always rewrite link text (regardless of href absoluteness).
       var navText = el.querySelector(".md-ellipsis");
       if (navText) {
-        var currentText = navText.textContent;
+        var currentText = navText.textContent.trim();
         if (NAV_I18N[currentText] && NAV_I18N[currentText][targetCode]) {
           navText.textContent = NAV_I18N[currentText][targetCode];
         }
