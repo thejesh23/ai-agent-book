@@ -64,3 +64,30 @@ blockquote {
   margin-left: 0;
   padding-left: 1em;
 }
+
+nav#toc > ol.toc {
+  list-style: none;
+  padding-left: 0;
+}
+
+nav#toc > ol.toc > li.chapter-group {
+  list-style: none;
+  margin: 2.5em 0;
+}
+
+nav#toc > ol.toc > li.chapter-group > a {
+  display: block;
+  font-size: 1.2em;
+  font-weight: bold;
+  margin-bottom: 1em;
+  text-align: center;
+}
+
+nav#toc > ol.toc > li.chapter-group > ol.toc {
+  list-style: none;
+  padding-left: 0;
+}
+
+nav#toc > ol.toc > li.chapter-group > ol.toc > li {
+  margin: 0.45em 0;
+}

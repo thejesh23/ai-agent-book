@@ -31,6 +31,11 @@ def flatten_nav(data):
     top_list = next(child for child in nav if child.tag == f"{{{XHTML}}}ol")
 
     for group in direct_children(top_list, f"{{{XHTML}}}li"):
+        classes = group.get("class", "").split()
+        if "chapter-group" not in classes:
+            classes.append("chapter-group")
+        group.set("class", " ".join(classes))
+
         nested_lists = direct_children(group, f"{{{XHTML}}}ol")
         if not nested_lists:
             continue
