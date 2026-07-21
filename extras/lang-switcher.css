@@ -1,46 +1,63 @@
-/* ── Language switcher tab bar ──────────────────────────────────── */
+/* ── Language switcher tab bar — lives inside .md-header__inner ─── */
 
-.lang-tabs {
-  display: flex;
-  gap: 0.25rem;
-  padding: 0.5rem 0 0.75rem;
-  margin-bottom: -0.25rem;
-  border-bottom: 1px solid var(--md-default-fg-color--lightest);
+.lang-tabs-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  margin-left: 0.6rem;
+  padding: 2px;
+  background: var(--md-default-bg-color--light);
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+[data-md-color-scheme="slate"] .lang-tabs-wrap {
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .lang-tab {
   display: inline-flex;
   align-items: center;
-  padding: 0.35em 0.9em;
-  font-size: 0.8em;
+  padding: 4px 10px;
+  font-size: 0.7rem;
   font-weight: 500;
   color: var(--md-default-fg-color--light);
   background: transparent;
-  border: 1px solid transparent;
-  border-radius: 6px;
+  border: none;
+  border-radius: 5px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  white-space: nowrap;
+  line-height: 1.3;
   letter-spacing: 0.01em;
-  line-height: 1.4;
+  transition: all 0.15s ease;
+  font-family: inherit;
 }
 
 .lang-tab:hover {
-  color: var(--md-accent-fg-color);
-  background: var(--md-accent-bg-color--light);
-  border-color: var(--md-accent-fg-color--light);
+  color: var(--md-typeset-a-color);
+  background: rgba(0, 0, 0, 0.05);
+}
+
+[data-md-color-scheme="slate"] .lang-tab:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #a8c7fa;
 }
 
 .lang-tab--active {
-  color: var(--md-accent-fg-color);
-  background: var(--md-accent-bg-color);
-  border-color: var(--md-accent-fg-color);
+  color: #fff;
+  background: var(--md-primary-fg-color);
   font-weight: 600;
-  cursor: default;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 
-/* Dark mode tweaks */
-[data-md-color-scheme=""] .lang-tab:hover,
-[data-md-color-scheme="slate"] .lang-tab:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.15);
+/* Slightly smaller on narrow screens */
+@media screen and (max-width: 59.9375em) {
+  .lang-tab {
+    font-size: 0.64rem;
+    padding: 3px 7px;
+  }
+  .lang-tabs-wrap {
+    margin-left: 0.3rem;
+    gap: 1px;
+  }
 }
