@@ -269,15 +269,17 @@ class PlayerAgent:
             target = raw
         if allow_none and target.lower() in ("none", "", "弃票", "放弃"):
             return None
-        # 归一化：精确匹配优先，否则模糊匹配（找出现的候选名）
+        # 归一化：精确匹配优先，其次按整 token 正则找 Pn，最后才做
+        # 子串模糊匹配（按候选名长度从长到短）。子串匹配不能先做：
+        # 候选按座位序迭代时 "P1" in "P10（他最可疑）" 会先命中，
+        # 把投给 P10+ 的票/刀/查验悄悄改到 P1 头上（≥10 人局）。
         if target in candidates:
             return target
-        for c in candidates:
-            if c in (target or ""):
-                return c
-        # 最后兜底：从原始串里搜 Pn
         m = re.search(r"P\d+", target or "")
         if m and m.group(0) in candidates:
             return m.group(0)
+        for c in sorted(candidates, key=len, reverse=True):
+            if c in (target or ""):
+                return c
         # 实在解析不出：好人默认弃票，狼人/必须选的场景由调用方兜底
         return None if allow_none else (candidates[0] if candidates else None)
