@@ -502,7 +502,10 @@ class ConnectionHandler {
           // Handle any remaining content
           if (currentSentence.trim()) {
             await this.synthesizeAndStreamAudio(currentSentence);
-            accumulatedContent += currentSentence;
+            // NOTE: do NOT add currentSentence to accumulatedContent here.
+            // Every token already did `accumulatedContent += content` as it
+            // arrived, so adding the trailing fragment again duplicates it in
+            // the message the user sees and in the history replayed to the LLM.
             
             // Update message history with final content
             const lastMessage = this.messageHistory[this.messageHistory.length - 1];
