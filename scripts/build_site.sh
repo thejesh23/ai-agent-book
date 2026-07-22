@@ -93,7 +93,8 @@ find "$DEST" -name '*.md.bak' -delete
 # and only relative links that don't start with . / # http or contain :
 find "$DEST/chapter"* -type f -name 'README.[a-zA-Z-]*.md' -print0 \
   | xargs -0 sed -i.bak -E \
-      -e 's|\]\(([a-zA-Z][a-zA-Z0-9_-]*)/\)|](../\1/)|g'
+      -e 's|\]\(([a-zA-Z][a-zA-Z0-9_-]*)/\)|](../\1/)|g' \
+      -e 's|\]\(\.\./docs/[a-zA-Z-]+/README\.md\)|](../../)|g'
 find "$DEST" -name '*.md.bak' -delete
 
 echo "Assembled docs into $DEST"
