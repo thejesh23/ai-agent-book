@@ -17,6 +17,9 @@ class SystemState:
     todos: List[Dict[str, Any]] = field(default_factory=list)
     shell_sessions: Dict[str, Any] = field(default_factory=dict)
     default_shell_id: str = "default"
+    # Byte offset already returned by BashOutput, per bash_id, so each call can
+    # return "only new output since the last check" as the tool documents.
+    bash_output_offsets: Dict[str, int] = field(default_factory=dict)
     os_type: str = field(default_factory=lambda: os.uname().sysname)
     python_version: str = field(default_factory=lambda: subprocess.getoutput("python3 --version"))
     
