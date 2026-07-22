@@ -210,7 +210,7 @@ class DifySearchClient:
             response = requests.post(
                 url,
                 headers=self.headers,
-                json={'documents': [document]}
+                json={'documents': [document]}, timeout=30
             )
             
             if response.status_code == 200:
@@ -263,7 +263,7 @@ class DifySearchClient:
             response = requests.post(
                 url,
                 headers=self.headers,
-                json=payload
+                json=payload, timeout=30
             )
             
             if response.status_code == 200:
