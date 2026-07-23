@@ -66,6 +66,23 @@ def search_impl(arguments: Dict[str, Any]) -> Any:
     return arguments
 
 
+# search_and_answer 不抛异常，而是以字符串形式返回失败兜底文案。
+# 下列前缀 / 文案是判断“一次搜索是否失败”的唯一来源，供调用方（如
+# examples.batch_search）复用，避免把失败响应误判为 success。
+SEARCH_ERROR_PREFIX = "搜索过程中出现错误"
+MAX_ITERATIONS_MESSAGE = "抱歉，搜索过程超过了最大迭代次数，请稍后重试。"
+NO_INFO_MESSAGE = "抱歉，我无法获取足够的信息来回答您的问题。"
+
+
+def is_failure_answer(answer: str) -> bool:
+    """判断 search_and_answer 的返回是否为失败兜底（未能正常作答）。"""
+    return (
+        answer.startswith(SEARCH_ERROR_PREFIX)
+        or answer == MAX_ITERATIONS_MESSAGE
+        or answer == NO_INFO_MESSAGE
+    )
+
+
 class WebSearchAgent:
     """
     Web Search Agent - 使用 Kimi API 的内置搜索工具
@@ -280,9 +297,11 @@ class WebSearchAgent:
                     note = "（注意：回答因达到 max_tokens 上限被截断，请增大 max_tokens 后重试。）"
                     final = f"{partial}\n\n{note}" if partial else note
                     self._emit({"iteration": iteration, "type": "answer", "content": final})
+                    # 存入历史时保留截断提示（final），否则 get_conversation_history()
+                    # 会丢失截断语义，后续复用历史时可能把不完整回答当作普通回答。
                     self.conversation_history.append({
                         "role": "assistant",
-                        "content": partial or final
+                        "content": final
                     })
                     return final
                 else:
@@ -303,13 +322,13 @@ class WebSearchAgent:
             # 如果达到最大迭代次数仍未完成
             if iteration >= max_iterations:
                 logger.warning(f"达到最大迭代次数 {max_iterations}")
-                return "抱歉，搜索过程超过了最大迭代次数，请稍后重试。"
-            
-            return "抱歉，我无法获取足够的信息来回答您的问题。"
+                return MAX_ITERATIONS_MESSAGE
+
+            return NO_INFO_MESSAGE
                 
         except Exception as e:
-            logger.error(f"搜索过程中出现错误: {str(e)}")
-            return f"搜索过程中出现错误: {str(e)}"
+            logger.error(f"{SEARCH_ERROR_PREFIX}: {str(e)}")
+            return f"{SEARCH_ERROR_PREFIX}: {str(e)}"
     
     def clear_history(self):
         """清空对话历史"""

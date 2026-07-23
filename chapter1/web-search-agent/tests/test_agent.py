@@ -187,3 +187,7 @@ def test_agent_loop_marks_truncated_partial_answer(make_choice):
 
     assert answer.startswith("部分答案，被截")
     assert "截断" in answer
+    # conversation_history retains the truncation marker (stores final, not the
+    # bare partial), so get_conversation_history() doesn't lose the semantics.
+    assert instance.conversation_history[-1]["role"] == "assistant"
+    assert "截断" in instance.conversation_history[-1]["content"]

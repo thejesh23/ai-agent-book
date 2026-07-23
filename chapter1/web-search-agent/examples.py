@@ -5,7 +5,7 @@
 import asyncio
 import json
 from typing import List, Dict, Any
-from agent import WebSearchAgent
+from agent import WebSearchAgent, is_failure_answer
 from config import Config
 import logging
 
@@ -34,9 +34,10 @@ class AdvancedWebSearchAgent(WebSearchAgent):
             try:
                 answer = self.search_and_answer(question)
                 # search_and_answer 内部已捕获异常并返回错误字符串（见 agent.py），
-                # 因此下面的 except 通常不会触发；据错误前缀判定状态，
+                # 因此下面的 except 通常不会触发。用统一的 is_failure_answer 判定状态，
+                # 覆盖“出现错误 / 超过最大迭代次数 / 无法获取足够信息”所有失败兜底，
                 # 避免把失败的搜索错误地标记为 success。
-                status = "error" if answer.startswith("搜索过程中出现错误") else "success"
+                status = "error" if is_failure_answer(answer) else "success"
                 results.append({
                     "question": question,
                     "answer": answer,
