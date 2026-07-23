@@ -50,7 +50,11 @@
       "    cursor: pointer;",
       "    pointer-events: auto !important;",
       "    margin: 0;",
-      "    padding: 0 0.2rem 0 0.4rem;",
+      // 4px top padding centres the 1.2rem icon on the title's FIRST line
+      // (6px link padding + ~1.3 line-height): the container aligns
+      // flex-start (book-theme.css) so wrapped two-line titles don't pull
+      // the chevron down between the lines.
+      "    padding: 4px 0.2rem 0 0.4rem;",
       "  }",
       // Material's own stylesheet already rotates the chevron's ::after
       // by 90° when the checkbox is checked — no extra transform here.

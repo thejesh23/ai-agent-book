@@ -127,11 +127,19 @@
   color: var(--fenix-link-hover) !important;
 }
 
-/* 章节标题行:标题 <a> 占满剩余宽度,箭头 <label> 靠右 */
+/* 章节标题行:标题 <a> 占满剩余宽度,箭头 <label> 靠右。
+   flex-start 让箭头对齐标题的第一行(居中时,折成两行的长标题
+   会把箭头挤到两行中间,和单行章节高低不一);箭头在首行内的
+   垂直居中由 nav-collapse.js 注入的 label padding 完成。 */
 .md-sidebar--primary .md-nav__item--nested > .md-nav__container {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   padding: 0;
+}
+
+/* 章节之间稍微多一点呼吸感(Material 默认 1.25em) */
+.md-sidebar--primary .md-nav__item--section {
+  margin: 1.4em 0;
 }
 .md-sidebar--primary .md-nav__item--nested > .md-nav__container > a.md-nav__link {
   flex: 1;
