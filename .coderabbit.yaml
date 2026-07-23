@@ -1,0 +1,11 @@
+# .coderabbit.yaml
+reviews:
+  language: zh-CN              # review 用中文
+  path_filters:
+    - "!**/*.lock"             # 不看 lock 文件
+    - "!**/book*/images/**"    # 不看配图
+  auto_review:
+    enabled: true
+    drafts: false              # draft PR 不 review
+chat:
+  auto_reply: true
