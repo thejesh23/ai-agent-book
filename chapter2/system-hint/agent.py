@@ -901,6 +901,18 @@ Important: When you have completed all tasks, clearly state "FINAL ANSWER:" foll
                 # even without the FINAL ANSWER: marker (e.g. a plain "hi"
                 # reply). Previously only "FINAL ANSWER:" broke the loop, so
                 # plain replies were re-sent for up to max_iterations.
+                # A reply cut off by max_tokens is not an answer: keep it and
+                # ask the model to continue instead of returning it as final.
+                if not has_tool_calls and getattr(response.choices[0], "finish_reason", None) == "length":
+                    self.conversation_history.append(message.model_dump())
+                    self.conversation_history.append({
+                        "role": "user",
+                        "content": "Your previous reply was cut off by the length limit. "
+                                   "Continue concisely and end with FINAL ANSWER: when done.",
+                    })
+                    logger.warning("Reply truncated (finish_reason=length); asking the model to continue")
+                    continue
+
                 if not has_tool_calls:
                     self.conversation_history.append(message.model_dump())
                     content = (message.content or "").strip()
