@@ -188,6 +188,26 @@ def test_evaluation_maps_human_source_labels_to_dynamic_rule_ids():
     assert metrics["retention_harm_rate"] == 0.0
 
 
+def test_unparsed_retention_verdict_counts_as_harm():
+    rules = [_rule("rule-a", ["fp-a"])]
+    eval_texts = {
+        "boundary": [],
+        "retention": [{"id": "r1", "text": "好文本"}, {"id": "r2", "text": "好文本"}],
+    }
+
+    def judge(batch_rules, texts):
+        key = (batch_rules[0]["id"], texts[0]["id"])
+        if texts[0]["id"] == "r1":
+            return {key: {"hit": False, "evidence": "", "parse_error": True}}
+        return {key: {"hit": False, "evidence": ""}}
+
+    metrics = evaluate_rules(rules, eval_texts, judge)
+    assert metrics["retention_harmed"] == 1
+    assert metrics["retention_details"][0]["unjudged"] == ["rule-a"]
+    assert metrics["retention_details"][1]["unjudged"] == []
+    assert metrics["per_rule"]["rule-a"]["fp"] == 0
+
+
 def test_skill_md_describes_llm_judge_and_structure(tmp_path):
     rules = [_rule()]
     markdown = render_skill_md(rules)

@@ -29,6 +29,17 @@ def _expected_rule_ids(item: Dict[str, Any], rules: List[Dict[str, Any]]) -> set
     }
 
 
+def _recording(judge_fn: JudgeFn, sink: dict) -> JudgeFn:
+    """包一层 judge，把原始 verdict（含 parse_error/missing 标记）留在 sink 里。"""
+
+    def judge(batch_rules, texts):
+        verdicts = judge_fn(batch_rules, texts)
+        sink.update(verdicts)
+        return verdicts
+
+    return judge
+
+
 def evaluate_rules(
     rules: List[Dict[str, Any]],
     eval_texts: Dict[str, List[Dict[str, Any]]],
@@ -65,9 +76,16 @@ def evaluate_rules(
     retention_details = []
     harmed = 0
     for item in eval_texts.get("retention", []):
-        fired = score_text(item["text"], rules, judge_fn, text_id=item["id"])
-        retention_details.append({"id": item["id"], "fired": sorted(fired)})
-        if fired:
+        verdicts: dict = {}
+        fired = score_text(item["text"], rules, _recording(judge_fn, verdicts), text_id=item["id"])
+        # judge 输出解析失败或缺少 verdict 时无法证明“无伤害”，按伤害计入保留集。
+        unjudged = sorted(
+            rule_id for rule_id in rule_ids
+            if verdicts.get((rule_id, item["id"]), {}).get("parse_error")
+            or verdicts.get((rule_id, item["id"]), {}).get("missing")
+        )
+        retention_details.append({"id": item["id"], "fired": sorted(fired), "unjudged": unjudged})
+        if fired or unjudged:
             harmed += 1
             for rule_id in fired:
                 fp[rule_id] += 1
