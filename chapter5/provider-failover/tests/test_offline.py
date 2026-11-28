@@ -119,6 +119,26 @@ def test_repair_orphans_inserts_a_placeholder_result():
     assert trace.repair_orphans() == []
 
 
+def test_repair_orphans_places_each_placeholder_after_its_own_call():
+    trace = Trace()
+    trace.user("算一下预算")
+    trace.add(Step(role="assistant", tool_calls=[ToolCall("get_flight_price", {"city": "东京"}, "c1")]))
+    trace.add(Step(role="assistant", text="再查酒店", tool_calls=[
+        ToolCall("get_hotel_price", {"city": "东京"}, "c2"),
+        ToolCall("get_hotel_price", {"city": "大阪"}, "c3"),
+    ]))
+    assert trace.repair_orphans() == ["c1", "c2", "c3"]
+    order = [(s.role, s.tool_call_id or [c.call_id for c in s.tool_calls]) for s in trace.steps]
+    assert order == [
+        ("user", []),
+        ("assistant", ["c1"]),
+        ("tool", "c1"),
+        ("assistant", ["c2", "c3"]),
+        ("tool", "c2"),
+        ("tool", "c3"),
+    ]
+
+
 def test_fingerprint_ignores_key_order():
     a = ToolCall("f", {"x": 1, "y": 2}, "c1").fingerprint()
     b = ToolCall("f", {"y": 2, "x": 1}, "c2").fingerprint()

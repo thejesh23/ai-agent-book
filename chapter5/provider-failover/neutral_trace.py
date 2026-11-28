@@ -87,14 +87,17 @@ class Trace:
         """
         answered = {s.tool_call_id for s in self.steps if s.role == "tool"}
         repaired = []
-        for i, step in enumerate(list(self.steps)):
+        steps = []
+        for step in self.steps:
+            steps.append(step)
             for call in step.tool_calls:
                 if call.call_id in answered:
                     continue
-                self.steps.insert(i + 1, Step(role="tool", text="[未返回结果：上一次请求中断]",
-                                              tool_call_id=call.call_id, tool_name=call.name))
+                steps.append(Step(role="tool", text="[未返回结果：上一次请求中断]",
+                                  tool_call_id=call.call_id, tool_name=call.name))
                 repaired.append(call.call_id)
                 answered.add(call.call_id)
+        self.steps[:] = steps
         return repaired
 
     def to_json(self) -> dict:
