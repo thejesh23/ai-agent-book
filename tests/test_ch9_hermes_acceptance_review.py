@@ -33,7 +33,7 @@ def run_gate(monkeypatch, tmp_path, transcript, returncode=0):
 
     def fake_run(cmd, **kwargs):
         if cmd[0] == "git":
-            return subprocess.CompletedProcess(cmd, 0, stdout="")
+            return subprocess.CompletedProcess(cmd, 0, stdout=b"")
         return subprocess.CompletedProcess(cmd, returncode, stdout=transcript)
 
     monkeypatch.setattr(run_acceptance_review.subprocess, "run", fake_run)
@@ -74,3 +74,41 @@ def test_last_verdict_line_wins(monkeypatch, tmp_path, capsys):
 def test_hermes_failure_exit_code_is_passed_through(monkeypatch, tmp_path, capsys):
     text = f"Query: {PROMPT}\nVERDICT: ACCEPT\n"
     assert run_gate(monkeypatch, tmp_path, text, returncode=1) == 1
+
+
+def make_dirty_checkout(root):
+    """A candidate checkout that already carries the uncommitted patch under review."""
+    source = root / "worktree" / "hermes-agent"
+    source.mkdir(parents=True)
+    git = ["git", "-c", "user.name=t", "-c", "user.email=t@example.com"]
+    subprocess.run(["git", "init", "-q"], cwd=source, check=True)
+    (source / "agent.py").write_text("original\n", encoding="utf-8")
+    subprocess.run(["git", "add", "agent.py"], cwd=source, check=True)
+    subprocess.run([*git, "commit", "-q", "-m", "init"], cwd=source, check=True)
+    (source / "agent.py").write_text("candidate patch\n", encoding="utf-8")
+    (source / "notes.md").write_text("candidate notes\n", encoding="utf-8")
+    return source
+
+
+@pytest.mark.parametrize("edited", [None, "agent.py", "notes.md"], ids=["none", "tracked", "untracked"])
+def test_reviewer_rewriting_an_already_dirty_file_is_caught(monkeypatch, tmp_path, capsys, edited):
+    source = make_dirty_checkout(tmp_path)
+    shutil.copy(EXPERIMENT / "acceptance_review.md", tmp_path / "acceptance_review.md")
+    monkeypatch.setattr(run_acceptance_review, "ROOT", tmp_path)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test")
+    monkeypatch.setattr(sys, "argv", ["run_acceptance_review.py", "--run-id", "t"])
+    real_run = subprocess.run
+
+    def fake_run(cmd, **kwargs):
+        if cmd[0] == "git":
+            return real_run(cmd, **kwargs)
+        if edited:
+            (source / edited).write_text("reviewer rewrote the candidate\n", encoding="utf-8")
+        return subprocess.CompletedProcess(cmd, 0, stdout=f"Query: {PROMPT}\nVERDICT: ACCEPT\n")
+
+    monkeypatch.setattr(run_acceptance_review.subprocess, "run", fake_run)
+    if edited is None:
+        assert run_acceptance_review.main() == 0
+        return
+    with pytest.raises(RuntimeError, match="modified the candidate checkout"):
+        run_acceptance_review.main()

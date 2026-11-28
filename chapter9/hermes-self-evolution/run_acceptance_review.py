@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import os
 from pathlib import Path
 import re
@@ -25,6 +26,27 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model", default=MODEL)
     parser.add_argument("--round", type=int, default=1)
     return parser.parse_args()
+
+
+def checkout_snapshot(source: Path) -> str:
+    """候选 checkout 的内容指纹：status、相对 HEAD 的完整 diff、未跟踪文件内容。
+
+    只比 `git status` 不够：候选补丁本来就让文件处于已修改状态，评审者再改同一个
+    文件时 status 行不会变化。
+    """
+    def git(*args: str) -> bytes:
+        return subprocess.run(
+            ["git", *args], cwd=source, stdout=subprocess.PIPE, check=True
+        ).stdout
+
+    digest = hashlib.sha256()
+    digest.update(git("status", "--porcelain=v1"))
+    digest.update(git("diff", "--binary", "HEAD"))
+    for name in git("ls-files", "--others", "--exclude-standard", "-z").split(b"\0"):
+        if name:
+            path = source / os.fsdecode(name)
+            digest.update(name + b"\0" + (path.read_bytes() if path.is_file() else b""))
+    return digest.hexdigest()
 
 
 def main() -> int:
@@ -49,13 +71,7 @@ def main() -> int:
         }
     )
     prompt = (ROOT / "acceptance_review.md").read_text(encoding="utf-8")
-    before = subprocess.run(
-        ["git", "status", "--porcelain=v1"],
-        cwd=source,
-        text=True,
-        stdout=subprocess.PIPE,
-        check=True,
-    ).stdout
+    before = checkout_snapshot(source)
     result = subprocess.run(
         [
             "uv", "run", "hermes", "chat",
@@ -72,13 +88,7 @@ def main() -> int:
     text = result.stdout or ""
     if any(pattern.search(text) for pattern in SECRET_PATTERNS):
         raise RuntimeError("credential-shaped value detected in review transcript")
-    after = subprocess.run(
-        ["git", "status", "--porcelain=v1"],
-        cwd=source,
-        text=True,
-        stdout=subprocess.PIPE,
-        check=True,
-    ).stdout
+    after = checkout_snapshot(source)
     if after != before:
         raise RuntimeError("acceptance reviewer modified the candidate checkout")
 
