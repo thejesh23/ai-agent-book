@@ -38,6 +38,10 @@ def generate_image(prompt: str, out_path: Path, book: ReceiptBook, name: str) ->
         out_path.write_bytes(image_bytes)
         resp_summary["image_bytes"] = len(image_bytes)
         resp_summary["saved_to"] = str(out_path)
+    except Exception as e:
+        status = "error"
+        resp_summary.setdefault("error", repr(e))
+        raise
     finally:
         ended = utc_now()
         book.record(name, provider="google-gemini",
